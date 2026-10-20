@@ -6,7 +6,7 @@ Altitude is a skill for coding agents. It turns any answer into one HTML page wi
 
 ![Bar chart: for the same answer, the 10k view is 184 words, under a minute of reading. The same answer as one long reply is 3,742 words, about 16 minutes.](assets/read-less.svg)
 
-**[See a live example: git rebase, at altitude →](https://jordanbench.github.io/altitude/examples/git-rebase.html)**
+**[See a live example: git rebase, at altitude →](https://jordanbench.github.io/altitude/examples/git-rebase.html)** It opens as an agent chat. You ask "explain git rebase using the altitude skill," and the page it builds sits next to the chat.
 Compare it with [the same answer as one long reply](examples/git-rebase.md).
 
 ## Why

@@ -18,6 +18,7 @@ Replace the colors, fonts, and content to fit the subject. Keep the tab structur
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#10161c;--surface:#171f27;--ink:#e5eaf0;--muted:#95a2b0;--line:#29333e;--accent:#5cc2de;--accent-soft:#16303a;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#10161c;--surface:#171f27;--ink:#e5eaf0;--muted:#95a2b0;--line:#29333e;--accent:#5cc2de;--accent-soft:#16303a;color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,sans-serif}
 .wrap{max-width:820px;margin:0 auto;padding-inline:16px;padding-block:28px 64px}
 .tabs{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;padding-block:10px;border-bottom:1px solid var(--line)}
