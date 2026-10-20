@@ -6,8 +6,16 @@ Altitude is a skill for coding agents. It turns any answer into one HTML page wi
 
 ![Bar chart: for the same answer, the 10k view is 184 words, under a minute of reading. The same answer as one long reply is 3,742 words, about 16 minutes.](assets/read-less.svg)
 
-**[See a live example: git rebase, at altitude →](https://jordanbench.github.io/altitude/examples/git-rebase.html)** It opens as an agent chat. You ask "explain git rebase using the altitude skill," and the page it builds sits next to the chat.
-Compare it with [the same answer as one long reply](examples/git-rebase.md).
+## See it
+
+Each example opens as an agent chat. You ask the agent to explain something using the altitude skill, and the page it builds sits next to the chat.
+
+| Example | The prompt | 10k view | Same answer as one long reply |
+| --- | --- | --- | --- |
+| **[git rebase, at altitude →](https://jordanbench.github.io/altitude/examples/git-rebase.html)** | "explain git rebase using the altitude skill" | 184 words, under 1 minute | [3,742 words, about 16 minutes](examples/git-rebase.md) |
+| **[AI agents, at altitude →](https://jordanbench.github.io/altitude/examples/ai-agents.html)** | "explain ai agents using the altitude skill" | 257 words, about 1 minute | [3,822 words, about 16 minutes](examples/ai-agents.md) |
+
+Word counts are prose only, not counting picture labels. Minutes are at 238 words a minute, the average adult reading speed for nonfiction (Brysbaert, 2019). The AI agents example proves its claims with [a small agent loop](examples/agent_loop.py) you can run with no API key.
 
 ## Why
 
@@ -95,7 +103,7 @@ Set `ALTITUDE_MODE` in the `env` block of your Claude Code settings:
 | `skills/altitude/SKILL.md` | The skill: what goes in each view and the rules for moving between them |
 | `skills/altitude/reference/tab-template.md` | The HTML starting point: tabs, styles, and the tab script |
 | `hooks/` | A session-start reminder, and a prompt hook that spots "altitude" in plain words |
-| `examples/` | The git rebase example, as an altitude page and as one long answer |
+| `examples/` | Two examples, each as an altitude page and as one long answer, plus the runnable agent loop |
 | `tests/` | Contract tests for the prompt hook, standard library only |
 
 Run the tests:

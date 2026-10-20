@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI agents, at altitude</title>
+<meta name="description" content="An example of the altitude skill: what an AI agent is and how it works, at four reading depths.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f6f8;--surface:#fff;--ink:#16202b;--muted:#5a6675;--faint:#9aa5b1;--line:#dbe1e7;--accent:#0b6e8a;--accent-soft:#dcedf2;--stop:#c2362b;--stop-soft:#f8e1de;--code:#eef1f4;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#10161c;--surface:#171f27;--ink:#e5eaf0;--muted:#95a2b0;--faint:#5c6875;--line:#29333e;--accent:#5cc2de;--accent-soft:#16303a;--stop:#ef6b5f;--stop-soft:#3a1d1a;--code:#0c1217;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10161c;--surface:#171f27;--ink:#e5eaf0;--muted:#95a2b0;--faint:#5c6875;--line:#29333e;--accent:#5cc2de;--accent-soft:#16303a;--stop:#ef6b5f;--stop-soft:#3a1d1a;--code:#0c1217;color-scheme:dark}
+*{box-sizing:border-box}
+/* Author display rules (like .panel{display:flex}) beat the browser's own [hidden] rule, so restate it. */
+[hidden]{display:none!important}
+/* Layout: a mock agent chat on the left, the artifact it made on the right. Stacks on phones. */
+.app{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);min-height:100vh}
+.chat{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--line);min-width:0}
+.chat-head{display:flex;gap:10px;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line)}
+.chat-head .dot{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.chat-head b{display:block;font-size:16px}
+.chat-head span{font-size:13px;color:var(--muted)}
+.thread{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;flex-direction:column;gap:8px;font-size:15.5px;line-height:1.5}
+.msg .who{font:600 12px/1 "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.msg.user{align-self:flex-end;max-width:88%;align-items:flex-end}
+.msg.user p{background:var(--accent);color:var(--bg);padding:10px 14px;border-radius:16px 16px 4px 16px}
+.msg.agent ul{padding-left:20px}
+.msg.agent li{margin:3px 0}
+.skill{align-self:flex-start;font:600 12px/1 "JetBrains Mono",monospace;padding:6px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.artifact-card{display:flex;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);color:var(--ink);text-decoration:none}
+.artifact-card:hover,.artifact-card:focus-visible{border-color:var(--accent);outline:none}
+.artifact-card .ai{flex:none;width:34px;height:40px;border-radius:6px;border:2px solid var(--accent);background:linear-gradient(var(--accent) 0 0) 6px 9px/18px 3px no-repeat,linear-gradient(var(--accent) 0 0) 6px 16px/14px 3px no-repeat,linear-gradient(var(--line) 0 0) 6px 23px/18px 3px no-repeat}
+.artifact-card b{display:block;font-size:15px}
+.artifact-card small{color:var(--muted);font-size:13px}
+.next{font-size:15px}
+.composer{margin:12px 18px 18px;display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border:1px solid var(--line);border-radius:14px;color:var(--faint);font-size:15px}
+.composer .send{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--surface);font-weight:700}
+.artifact{min-width:0;max-width:900px;width:100%;margin:0 auto;padding-inline:20px;padding-block:20px 64px}
+.art-head{display:flex;flex-direction:column;gap:6px;padding-bottom:10px}
+.art-kind{font:600 12px/1 "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+@media (max-width:900px){.app{grid-template-columns:1fr}.chat{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}.thread{overflow:visible}.artifact{padding-inline:16px}}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;overflow-wrap:break-word}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:28px 64px}
+h1{margin:0;font-size:clamp(30px,6vw,46px);line-height:1.1}
+h1 code{font-size:.9em}
+.sub{margin:8px 0 18px;color:var(--muted)}
+h3{margin:12px 0 0;font-size:22px;line-height:1.25}
+h4{margin:6px 0 0;font-size:18px}
+p{margin:0}
+a{color:var(--accent)}
+code,pre,kbd{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+:not(pre)>code{font-size:.88em;background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:2;background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;padding-block:10px;border-bottom:1px solid var(--line)}
+.tabs button{font:600 13px/1 "JetBrains Mono",ui-monospace,monospace;padding:9px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{display:flex;flex-direction:column;gap:20px;padding-top:24px;min-width:0}
+.panel>*{min-width:0}
+.fig{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px}
+.fig svg{display:block;width:100%;height:auto}
+.fig figcaption{margin-top:8px;font-size:15px;color:var(--muted)}
+figure{margin:0}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td.pick{color:var(--accent);font-weight:700}
+.where{margin:0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;font-size:16px}
+.lead{font-size:20px;line-height:1.45}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:10px}
+.card.rec{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.card.warn{border-color:var(--stop);box-shadow:inset 4px 0 0 var(--stop)}
+ul,ol{margin:0;padding-left:22px}
+li{margin:4px 0}
+.parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.parts .card h4{margin:0;color:var(--accent)}
+pre{margin:0;overflow-x:auto;max-width:100%;background:var(--code);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13.5px;line-height:1.55;white-space:pre}
+pre.out{background:var(--surface);border-style:dashed}
+.lbl{font:600 12px/1 "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:-4px}
+.proof{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px;min-width:0}
+.proof h3{margin:0;font-size:20px}
+.proof .claim{color:var(--muted);font-size:15px}
+.tag{display:inline-block;font:700 12px/1 "JetBrains Mono",monospace;background:var(--accent);color:var(--bg);border-radius:4px;padding:4px 6px;margin-right:6px;vertical-align:2px}
+.look{font-size:15px;border-left:3px solid var(--accent);padding-left:10px}
+/* 10k view: one idea per pane, a big picture, a few words */
+.pane{background:var(--surface);border-radius:18px;padding:26px;display:grid;gap:16px;min-width:0}
+.pane h2{margin:0;font-size:clamp(28px,5vw,42px);line-height:1.08;text-wrap:balance}
+.pane p{margin:0;font-size:19px;line-height:1.45;max-width:52ch;color:var(--muted)}
+.pane .pic{background:var(--bg);border-radius:12px;padding:12px;min-width:0}
+.pane svg{display:block;width:100%;height:auto}
+.pane .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* SVG vocabulary */
+svg text{font-family:"Atkinson Hyperlegible",system-ui,sans-serif}
+.lb{font-weight:700;font-size:24px;fill:var(--ink)}
+.lb.s{font-size:19px;font-weight:400;fill:var(--muted)}
+.lb.h{font-size:40px}
+.lb.a{fill:var(--accent)}
+.lb.r{fill:var(--stop)}
+.lb.w{fill:#fff}
+.lb.m{font-family:"JetBrains Mono",monospace;font-weight:600}
+.ties{fill:none;stroke:var(--line);stroke-width:28;stroke-dasharray:5 15}
+.rl{fill:none;stroke:var(--faint);stroke-width:7;stroke-linecap:round}
+.rl.a{stroke:var(--accent)}
+.rl.g{stroke-dasharray:4 10;opacity:.8}
+.bead{fill:var(--surface);stroke:var(--muted);stroke-width:5}
+.bead.a{fill:var(--accent);stroke:var(--accent)}
+.bead.r{fill:var(--stop);stroke:var(--stop)}
+.bead.g{fill:none;stroke:var(--faint);stroke-dasharray:6 5}
+.box{fill:var(--surface);stroke:var(--muted);stroke-width:3}
+.box.a{fill:var(--accent-soft);stroke:var(--accent)}
+.box.r{fill:var(--stop-soft);stroke:var(--stop)}
+.box.g{fill:none;stroke:var(--faint);stroke-dasharray:7 6}
+.box.f{fill:var(--bg)}
+.ln{fill:none;stroke:var(--muted);stroke-width:4;stroke-linecap:round}
+.ln.a{stroke:var(--accent)}
+.ln.r{stroke:var(--stop)}
+.ln.t{stroke-width:2.5}
+.ln.d{stroke-dasharray:6 6}
+.fa{fill:var(--accent)}
+.fm{fill:var(--muted)}
+.ff{fill:var(--faint)}
+.fr{fill:var(--stop)}
+.fs{fill:var(--surface)}
+.fb{fill:var(--bg)}
+.mk{fill:var(--muted)}
+.mk.a{fill:var(--accent)}
+.mk.r{fill:var(--stop)}
+@media (max-width:640px){.pane{padding:16px}.pane .two{grid-template-columns:1fr}.pane p{font-size:17px}body{font-size:16px}.lead{font-size:18px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="aha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path class="mk a" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ahr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path class="mk r" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<div class="app">
+<aside class="chat" aria-label="Agent chat">
+  <div class="chat-head">
+    <span class="dot" aria-hidden="true"></span>
+    <div><b>Agent session</b><span>Example of the altitude skill · mock chat</span></div>
+  </div>
+  <div class="thread">
+    <div class="msg user">
+      <span class="who">You</span>
+      <p>explain ai agents using the altitude skill</p>
+    </div>
+    <div class="msg agent">
+      <span class="who">Agent</span>
+      <span class="skill">Used skill · altitude</span>
+      <p>Here's how AI agents work, at four reading depths. Start on the 10k view and go deeper only if you need to.</p>
+      <ul>
+        <li>An agent is a chat model in a loop: it thinks, uses a tool, looks at the result, and repeats until it's done.</li>
+        <li>The model only asks for actions. The program around it, the harness, runs the tools.</li>
+        <li>Its memory is the conversation so far. That fills up, and every step costs more than the last.</li>
+        <li>Small mistakes add up over many steps, so fence it in: step limits, approval for risky actions, read before write.</li>
+      </ul>
+      <a class="artifact-card" href="#v10k" data-open>
+        <span class="ai" aria-hidden="true"></span>
+        <span><b>AI agents, at altitude</b><small>HTML page · 4 tabs · opens on the 10k view</small></span>
+      </a>
+      <p class="next"><b>Next:</b> run the demo script in the 100 view and watch one loop end to end.</p>
+    </div>
+  </div>
+  <div class="composer" aria-hidden="true"><span>Reply to the agent…</span><span class="send">↑</span></div>
+</aside>
+
+<main class="artifact" id="artifact">
+  <div class="art-head">
+    <span class="art-kind">Artifact</span>
+    <h1>AI agents, at altitude</h1>
+  </div>
+
+  <div class="tabs" role="tablist" aria-label="Altitude">
+    <button role="tab" id="t-v10k" aria-controls="v10k" aria-selected="true">10k view</button>
+    <button role="tab" id="t-v5k" aria-controls="v5k" aria-selected="false">5k view</button>
+    <button role="tab" id="t-v1k" aria-controls="v1k" aria-selected="false">1k view</button>
+    <button role="tab" id="t-v100" aria-controls="v100" aria-selected="false">100 view</button>
+  </div>
+
+  <!-- ===================================================== 10k -->
+  <section class="panel" role="tabpanel" id="v10k" aria-labelledby="t-v10k">
+    <p class="where"><b>What is it?</b> Start here. What an AI agent is, in pictures. You only need to have used a chat AI.</p>
+
+    <!-- 1 -->
+    <div class="pane">
+      <h2>An agent is a chat AI that can also do things.</h2>
+      <div class="two">
+        <div class="pic">
+          <svg viewBox="0 0 340 300" role="img" aria-label="Chat AI: a speech bubble that says here's how to fix it. You still do the work.">
+            <text class="lb s" x="20" y="36">chat AI</text>
+            <rect class="box" x="30" y="62" width="280" height="130" rx="22"/>
+            <path class="box" d="M90,190 L80,232 L130,191"/>
+            <text class="lb" x="170" y="118" text-anchor="middle">"Here's how</text>
+            <text class="lb" x="170" y="152" text-anchor="middle">to fix it."</text>
+            <text class="lb s" x="170" y="272" text-anchor="middle">you do the work</text>
+          </svg>
+        </div>
+        <div class="pic">
+          <svg viewBox="0 0 340 300" role="img" aria-label="Agent: a worker at a desk with a laptop and an open toolbox. It does the work.">
+            <text class="lb s" x="20" y="36">agent</text>
+            <circle class="fm" cx="80" cy="104" r="22"/>
+            <path class="fm" d="M48,186 V150 a32,26 0 0 1 64,0 V186 Z"/>
+            <rect class="box" x="122" y="138" width="78" height="48" rx="4"/>
+            <rect class="fm" x="30" y="186" width="290" height="12" rx="3"/>
+            <rect class="fm" x="44" y="198" width="10" height="44"/>
+            <rect class="fm" x="296" y="198" width="10" height="44"/>
+            <rect class="box a" x="214" y="128" width="96" height="58" rx="7"/>
+            <path class="ln a t" d="M240,128 V114 H284 V128"/>
+            <text class="lb a" x="262" y="166" text-anchor="middle" style="font-size:20px">tools</text>
+            <text class="lb a" x="170" y="272" text-anchor="middle">it does the work</text>
+          </svg>
+        </div>
+      </div>
+      <p>Same kind of model inside. The difference is the tools and the loop around it.</p>
+    </div>
+
+    <!-- 2 -->
+    <div class="pane">
+      <h2>It works in a loop: think, act, look, repeat.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 440" role="img" aria-label="A racetrack with three stations: think at the top, act with a tool on the right, look at the result at the bottom. On the left, a check asks if it's done. If yes, it exits to a finish flag.">
+          <rect class="ties" x="170" y="100" width="400" height="220" rx="110"/>
+          <rect class="rl a" x="170" y="100" width="400" height="220" rx="110"/>
+          <path class="ln a" d="M400,100 H440" marker-end="url(#aha)"/>
+          <path class="ln a" d="M340,320 H300" marker-end="url(#aha)"/>
+          <circle class="bead a" cx="370" cy="100" r="24"/>
+          <circle class="bead a" cx="570" cy="210" r="24"/>
+          <circle class="bead a" cx="370" cy="320" r="24"/>
+          <circle class="bead" cx="170" cy="210" r="22"/>
+          <text class="lb" x="370" y="62" text-anchor="middle">think</text>
+          <text class="lb" x="606" y="204">act</text>
+          <text class="lb s" x="606" y="232">use a tool</text>
+          <text class="lb" x="370" y="380" text-anchor="middle">look</text>
+          <text class="lb s" x="370" y="408" text-anchor="middle">read the result</text>
+          <text class="lb s" x="198" y="217">done?</text>
+          <text class="lb a" x="400" y="204" text-anchor="middle">one lap</text>
+          <text class="lb a" x="400" y="234" text-anchor="middle">= one step</text>
+          <path class="ln" d="M146,210 H112" marker-end="url(#ah)"/>
+          <rect class="fm" x="86" y="150" width="6" height="120"/>
+          <path class="fa" d="M86,152 H28 L42,170 L28,188 H86 Z"/>
+          <text class="lb a" x="66" y="306" text-anchor="middle">yes:</text>
+          <text class="lb a" x="66" y="334" text-anchor="middle">finish</text>
+        </svg>
+      </div>
+      <p>Most real tasks take several laps. It stops when it's done or when it runs out of laps.</p>
+    </div>
+
+    <!-- 3 -->
+    <div class="pane">
+      <h2>The model only asks. Another program does the work.</h2>
+      <div class="pic">
+        <svg viewBox="0 60 720 360" role="img" aria-label="On the left, the model sits behind a counter and passes a note that says read notes.txt. On the right, the harness holds the toolbox, runs the tool, and passes the result back.">
+          <rect class="box" x="30" y="80" width="200" height="220" rx="14"/>
+          <circle class="fm" cx="130" cy="150" r="28"/>
+          <path class="fm" d="M84,250 V214 a46,34 0 0 1 92,0 V250 Z"/>
+          <rect class="fm" x="30" y="250" width="200" height="14"/>
+          <text class="lb" x="130" y="340" text-anchor="middle">the model</text>
+          <text class="lb s" x="130" y="368" text-anchor="middle">thinks, asks</text>
+          <rect class="box a" x="262" y="84" width="196" height="44" rx="8"/>
+          <text class="lb a" x="360" y="114" text-anchor="middle" style="font-size:20px">read notes.txt</text>
+          <path class="ln a" d="M236,150 H480" marker-end="url(#aha)"/>
+          <rect class="box" x="490" y="80" width="200" height="220" rx="14"/>
+          <text class="lb" x="590" y="140" text-anchor="middle">runs it</text>
+          <rect class="box a" x="530" y="186" width="120" height="62" rx="8"/>
+          <path class="ln a t" d="M565,186 V170 H615 V186"/>
+          <text class="lb a" x="590" y="225" text-anchor="middle" style="font-size:20px">tools</text>
+          <text class="lb" x="590" y="340" text-anchor="middle">the harness</text>
+          <text class="lb s" x="590" y="368" text-anchor="middle">the program around it</text>
+          <path class="ln" d="M484,234 H240" marker-end="url(#ah)"/>
+          <rect class="box f" x="250" y="250" width="220" height="44" rx="8"/>
+          <text class="lb s" x="360" y="279" text-anchor="middle">"teh meeting is at 3pm"</text>
+          <text class="lb s" x="360" y="406" text-anchor="middle">the result comes back as text</text>
+        </svg>
+      </div>
+      <p>The model can't touch anything directly. It only sees what the harness hands back.</p>
+    </div>
+
+    <!-- 4 -->
+    <div class="pane">
+      <h2>Its memory is a notepad, and the notepad fills up.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 440" role="img" aria-label="A spiral notepad. The first line is the goal. Each step adds a line. Near the bottom a red line marks full: oldest notes get cut or summarized.">
+          <rect class="box" x="200" y="40" width="320" height="370" rx="10"/>
+          <g class="ln t"><circle cx="240" cy="40" r="9"/><circle cx="290" cy="40" r="9"/><circle cx="340" cy="40" r="9"/><circle cx="390" cy="40" r="9"/><circle cx="440" cy="40" r="9"/><circle cx="490" cy="40" r="9"/></g>
+          <text class="lb a" x="224" y="96" style="font-size:21px">goal: fix the typo</text>
+          <text class="lb" x="224" y="138" style="font-size:21px">step 1: looked around</text>
+          <text class="lb" x="224" y="180" style="font-size:21px">step 2: read the file</text>
+          <text class="lb" x="224" y="222" style="font-size:21px">step 3: wrote the fix</text>
+          <rect class="ff" x="224" y="248" width="250" height="12" rx="6"/>
+          <rect class="ff" x="224" y="282" width="210" height="12" rx="6"/>
+          <rect class="ff" x="224" y="316" width="268" height="12" rx="6"/>
+          <path class="ln r d" d="M206,360 H514"/>
+          <text class="lb r" x="504" y="392" text-anchor="end" style="font-size:21px">full</text>
+          <text class="lb s" x="186" y="168" text-anchor="end">every step</text>
+          <text class="lb s" x="186" y="194" text-anchor="end">adds lines</text>
+          <text class="lb r" x="540" y="352">when it's full,</text>
+          <text class="lb s" x="540" y="380">old notes get cut</text>
+          <text class="lb s" x="540" y="406">or summarized</text>
+        </svg>
+      </div>
+      <p>If it isn't on the notepad, the agent doesn't know it. That includes past sessions.</p>
+    </div>
+
+    <!-- 5 -->
+    <div class="pane">
+      <h2>Small mistakes add up over many steps.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 400" role="img" aria-label="A dashed line runs straight from start to the goal flag. The agent's real path slips a little at step 2 and drifts further each step, ending far below the goal at step 6.">
+          <path class="ln d" d="M60,300 L650,130"/>
+          <path class="ln r" d="M60,300 L160,271 L260,250 L360,240 L460,245 L560,262 L650,285"/>
+          <circle class="bead" cx="60" cy="300" r="12"/>
+          <circle class="bead" cx="160" cy="271" r="12"/>
+          <circle class="bead r" cx="260" cy="250" r="13"/>
+          <circle class="bead" cx="360" cy="240" r="12"/>
+          <circle class="bead" cx="460" cy="245" r="12"/>
+          <circle class="bead" cx="560" cy="262" r="12"/>
+          <circle class="bead r" cx="650" cy="285" r="13"/>
+          <rect class="fm" x="647" y="58" width="6" height="80"/>
+          <path class="fa" d="M653,60 H703 L691,76 L703,92 H653 Z"/>
+          <text class="lb a" x="630" y="86" text-anchor="end">goal</text>
+          <text class="lb s" x="410" y="160" text-anchor="middle">the plan</text>
+          <text class="lb s" x="60" y="344" text-anchor="middle">start</text>
+          <text class="lb r" x="260" y="320" text-anchor="middle">step 2: a small slip</text>
+          <text class="lb r" x="690" y="340" text-anchor="end">way off by step 6</text>
+        </svg>
+      </div>
+      <p>Each step trusts the step before it. One wrong read early can steer every later step.</p>
+    </div>
+
+    <!-- 6 -->
+    <div class="pane">
+      <h2>The risk that matters most: it acts on its own. Fence it in.</h2>
+      <div class="two">
+        <div class="pic">
+          <svg viewBox="0 0 340 330" role="img" aria-label="A stop sign: a step limit stops runaway loops.">
+            <polygon class="fr" points="135,30 205,30 255,80 255,150 205,200 135,200 85,150 85,80"/>
+            <polygon fill="none" stroke="#fff" stroke-width="4" points="138,38 202,38 247,83 247,147 202,192 138,192 93,147 93,83"/>
+            <text class="lb w h" x="170" y="130" text-anchor="middle">STOP</text>
+            <rect class="fm" x="164" y="200" width="12" height="44"/>
+            <text class="lb" x="170" y="284" text-anchor="middle">a step limit</text>
+            <text class="lb s" x="170" y="310" text-anchor="middle">ends runaway loops</text>
+          </svg>
+        </div>
+        <div class="pic">
+          <svg viewBox="0 0 340 330" role="img" aria-label="A locked gate with a key below it: risky actions need your yes.">
+            <rect class="fm" x="50" y="40" width="14" height="190"/>
+            <rect class="fm" x="276" y="40" width="14" height="190"/>
+            <path class="ln" d="M64,70 H276 M64,200 H276 M100,70 V200 M136,70 V200 M204,70 V200 M240,70 V200"/>
+            <rect class="box a" x="144" y="118" width="52" height="44" rx="6"/>
+            <path class="ln a t" d="M156,118 V106 a14,14 0 0 1 28,0 V118"/>
+            <circle class="fa" cx="170" cy="138" r="5"/>
+            <circle class="ln a" cx="130" cy="252" r="12"/>
+            <path class="ln a" d="M142,252 H206 M190,252 V264 M202,252 V262"/>
+            <text class="lb a" x="170" y="296" text-anchor="middle">needs your yes</text>
+            <text class="lb s" x="170" y="318" text-anchor="middle">for risky actions</text>
+          </svg>
+        </div>
+      </div>
+      <p>Also: make it read before it writes, and run it where mistakes are cheap to undo.</p>
+    </div>
+
+    <!-- 7 -->
+    <div class="pane">
+      <h2>Every step costs time and money, and later steps cost more.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 400" role="img" aria-label="Six stacks of pages, one per step. Step 1 rereads one page, step 6 rereads six. The newest page in each stack is highlighted.">
+          <text class="lb s" x="360" y="40" text-anchor="middle">what the model rereads at each step</text>
+          <g>
+            <rect class="box a" x="75" y="270" width="70" height="26" rx="4"/>
+            <rect class="box" x="175" y="270" width="70" height="26" rx="4"/><rect class="box a" x="175" y="240" width="70" height="26" rx="4"/>
+            <rect class="box" x="275" y="270" width="70" height="26" rx="4"/><rect class="box" x="275" y="240" width="70" height="26" rx="4"/><rect class="box a" x="275" y="210" width="70" height="26" rx="4"/>
+            <rect class="box" x="375" y="270" width="70" height="26" rx="4"/><rect class="box" x="375" y="240" width="70" height="26" rx="4"/><rect class="box" x="375" y="210" width="70" height="26" rx="4"/><rect class="box a" x="375" y="180" width="70" height="26" rx="4"/>
+            <rect class="box" x="475" y="270" width="70" height="26" rx="4"/><rect class="box" x="475" y="240" width="70" height="26" rx="4"/><rect class="box" x="475" y="210" width="70" height="26" rx="4"/><rect class="box" x="475" y="180" width="70" height="26" rx="4"/><rect class="box a" x="475" y="150" width="70" height="26" rx="4"/>
+            <rect class="box" x="575" y="270" width="70" height="26" rx="4"/><rect class="box" x="575" y="240" width="70" height="26" rx="4"/><rect class="box" x="575" y="210" width="70" height="26" rx="4"/><rect class="box" x="575" y="180" width="70" height="26" rx="4"/><rect class="box" x="575" y="150" width="70" height="26" rx="4"/><rect class="box a" x="575" y="120" width="70" height="26" rx="4"/>
+          </g>
+          <text class="lb s" x="110" y="330" text-anchor="middle">step 1</text>
+          <text class="lb s" x="210" y="330" text-anchor="middle">2</text>
+          <text class="lb s" x="310" y="330" text-anchor="middle">3</text>
+          <text class="lb s" x="410" y="330" text-anchor="middle">4</text>
+          <text class="lb s" x="510" y="330" text-anchor="middle">5</text>
+          <text class="lb s" x="610" y="330" text-anchor="middle">6</text>
+          <text class="lb a" x="360" y="380" text-anchor="middle">each step rereads all the notes so far</text>
+        </svg>
+      </div>
+      <p>So a long run costs more than its step count suggests. Waiting time grows the same way.</p>
+    </div>
+
+    <!-- 8 -->
+    <div class="pane">
+      <h2>Use an agent only when you can't list the steps ahead of time.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 400" role="img" aria-label="Three options. One question: a single prompt gives one answer. Known steps: a script does the same thing every time. Unknown steps: an agent figures it out. An arrow shows the left side is cheaper and more predictable.">
+          <rect class="box" x="40" y="70" width="160" height="104" rx="20"/>
+          <path class="box" d="M84,172 L76,204 L116,173"/>
+          <text class="lb h" x="120" y="138" text-anchor="middle">?</text>
+          <rect class="box" x="280" y="56" width="160" height="136" rx="8"/>
+          <text class="lb m" x="300" y="98" style="font-size:20px">1</text><rect class="ff" x="326" y="86" width="96" height="10" rx="5"/>
+          <text class="lb m" x="300" y="134" style="font-size:20px">2</text><rect class="ff" x="326" y="122" width="80" height="10" rx="5"/>
+          <text class="lb m" x="300" y="170" style="font-size:20px">3</text><rect class="ff" x="326" y="158" width="90" height="10" rx="5"/>
+          <circle class="fm" cx="560" cy="96" r="20"/>
+          <path class="fm" d="M532,190 V150 a28,24 0 0 1 56,0 V190 Z"/>
+          <rect class="box a" x="600" y="136" width="84" height="54" rx="7"/>
+          <path class="ln a t" d="M624,136 V124 H660 V136"/>
+          <text class="lb" x="120" y="240" text-anchor="middle">one question</text>
+          <text class="lb s" x="120" y="268" text-anchor="middle">a single prompt</text>
+          <text class="lb" x="360" y="240" text-anchor="middle">known steps</text>
+          <text class="lb s" x="360" y="268" text-anchor="middle">a script, same</text>
+          <text class="lb s" x="360" y="292" text-anchor="middle">every time</text>
+          <text class="lb a" x="600" y="240" text-anchor="middle">unknown steps</text>
+          <text class="lb s" x="600" y="268" text-anchor="middle">an agent works</text>
+          <text class="lb s" x="600" y="292" text-anchor="middle">them out</text>
+          <path class="ln t" d="M640,334 H80" marker-end="url(#ah)"/>
+          <text class="lb s" x="360" y="376" text-anchor="middle">cheaper and more predictable this way</text>
+        </svg>
+      </div>
+      <p>If a fixed script can do the job, use the script.</p>
+    </div>
+
+    <!-- 9 -->
+    <div class="pane">
+      <h2>Start it on a short leash. Widen it as it earns trust.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 360" role="img" aria-label="Three stairs. Step one, highlighted: read only, start here. Step two: edits you review. Step three: unattended, for low-risk jobs you can undo.">
+          <rect class="box a" x="40" y="220" width="200" height="80" rx="8"/>
+          <rect class="box" x="260" y="160" width="200" height="140" rx="8"/>
+          <rect class="box" x="480" y="100" width="200" height="200" rx="8"/>
+          <text class="lb a" x="140" y="256" text-anchor="middle">read only</text>
+          <text class="lb s" x="140" y="284" text-anchor="middle">start here</text>
+          <text class="lb" x="360" y="198" text-anchor="middle">edits you</text>
+          <text class="lb" x="360" y="226" text-anchor="middle">review</text>
+          <text class="lb s" x="360" y="262" text-anchor="middle">after checks pass</text>
+          <text class="lb" x="580" y="140" text-anchor="middle">unattended</text>
+          <text class="lb s" x="580" y="172" text-anchor="middle">low-risk jobs</text>
+          <text class="lb s" x="580" y="198" text-anchor="middle">you can undo</text>
+          <path class="ln a" d="M110,196 C180,120 300,90 440,74" marker-end="url(#aha)"/>
+          <text class="lb s" x="360" y="340" text-anchor="middle">add one tool or permission at a time</text>
+        </svg>
+      </div>
+      <p>Next: run the demo in the 100 view and watch one loop, a step limit, and an approval gate.</p>
+    </div>
+  </section>
+
+  <!-- ===================================================== 5k -->
+  <section class="panel" role="tabpanel" id="v5k" aria-labelledby="t-v5k" hidden>
+    <p class="where"><b>How does it work?</b> Read this if the 10k view made sense and you want the moving parts.</p>
+    <p class="lead">The 10k view showed a model in a loop that only asks, and a harness that does the work. Here are the parts: the model, the harness, the tools, the message list, and the guards. One step moves data through all of them, in the same order every time.</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 760 450" role="img" aria-label="Parts diagram. The model on the left reads messages and returns a decision. The harness in the middle holds the message list, the guards, and the loop. The tools on the right are plain functions that only the harness calls.">
+        <rect class="box" x="20" y="160" width="130" height="120" rx="10"/>
+        <text class="lb" x="85" y="200" text-anchor="middle" style="font-size:21px">model</text>
+        <text class="lb s" x="85" y="230" text-anchor="middle" style="font-size:14px">in: messages</text>
+        <text class="lb s" x="85" y="254" text-anchor="middle" style="font-size:14px">out: a decision</text>
+        <rect class="box g" x="200" y="40" width="340" height="390" rx="14"/>
+        <text class="lb" x="370" y="74" text-anchor="middle" style="font-size:20px">harness (your program)</text>
+        <rect class="box f" x="220" y="96" width="180" height="314" rx="8"/>
+        <text class="lb" x="310" y="124" text-anchor="middle" style="font-size:17px">message list</text>
+        <rect class="box" x="232" y="140" width="156" height="34" rx="4"/><text class="lb s" x="310" y="162" text-anchor="middle" style="font-size:14px">rules + tool list</text>
+        <rect class="box a" x="232" y="180" width="156" height="34" rx="4"/><text class="lb a" x="310" y="202" text-anchor="middle" style="font-size:14px">goal</text>
+        <rect class="box" x="232" y="220" width="156" height="34" rx="4"/><text class="lb s" x="310" y="242" text-anchor="middle" style="font-size:14px">call: read_file</text>
+        <rect class="box" x="232" y="260" width="156" height="34" rx="4"/><text class="lb s" x="310" y="282" text-anchor="middle" style="font-size:14px">result: teh meeting…</text>
+        <rect class="box" x="232" y="300" width="156" height="34" rx="4"/><text class="lb s" x="310" y="322" text-anchor="middle" style="font-size:14px">call: write_file</text>
+        <rect class="box g" x="232" y="340" width="156" height="34" rx="4"/><text class="lb s" x="310" y="362" text-anchor="middle" style="font-size:14px">next result…</text>
+        <rect class="box r" x="414" y="96" width="112" height="130" rx="8"/>
+        <text class="lb r" x="470" y="124" text-anchor="middle" style="font-size:17px">guards</text>
+        <text class="lb s" x="470" y="152" text-anchor="middle" style="font-size:14px">step limit</text>
+        <text class="lb s" x="470" y="176" text-anchor="middle" style="font-size:14px">approval</text>
+        <text class="lb s" x="470" y="200" text-anchor="middle" style="font-size:14px">read first</text>
+        <rect class="box a" x="414" y="240" width="112" height="170" rx="8"/>
+        <text class="lb a" x="470" y="270" text-anchor="middle" style="font-size:17px">loop</text>
+        <text class="lb s" x="470" y="300" text-anchor="middle" style="font-size:14px">call model</text>
+        <text class="lb s" x="470" y="324" text-anchor="middle" style="font-size:14px">check guards</text>
+        <text class="lb s" x="470" y="348" text-anchor="middle" style="font-size:14px">run tool</text>
+        <text class="lb s" x="470" y="372" text-anchor="middle" style="font-size:14px">save result</text>
+        <path class="ln t" d="M216,200 H156" marker-end="url(#ah)"/>
+        <path class="ln a t" d="M152,240 H212" marker-end="url(#aha)"/>
+        <text class="lb" x="650" y="90" text-anchor="middle" style="font-size:20px">tools</text>
+        <rect class="box" x="580" y="108" width="160" height="46" rx="6"/><text class="lb m" x="660" y="137" text-anchor="middle" style="font-size:15px">list_files</text>
+        <rect class="box" x="580" y="166" width="160" height="46" rx="6"/><text class="lb m" x="660" y="195" text-anchor="middle" style="font-size:15px">read_file</text>
+        <rect class="box" x="580" y="224" width="160" height="46" rx="6"/><text class="lb m" x="660" y="253" text-anchor="middle" style="font-size:15px">write_file</text>
+        <rect class="box r" x="580" y="282" width="160" height="46" rx="6"/><text class="lb r m" x="660" y="311" text-anchor="middle" style="font-size:15px">delete_file</text>
+        <path class="ln a t" d="M530,300 H574" marker-end="url(#aha)"/>
+        <path class="ln t" d="M576,340 H532" marker-end="url(#ah)"/>
+        <text class="lb s" x="660" y="370" text-anchor="middle" style="font-size:14px">plain functions</text>
+        <text class="lb s" x="660" y="392" text-anchor="middle" style="font-size:14px">red = needs approval</text>
+      </svg>
+      <figcaption>The model sees only the message list. Only the harness calls tools, and every call passes the guards first. Tool names match the demo script in the 100 view.</figcaption>
+    </figure>
+
+    <h3>The parts</h3>
+    <div class="parts">
+      <div class="card"><h4>The model</h4><p>A language model. It takes text in and gives text out. In an agent, the text out is one decision: call this tool with these arguments, or give the final answer. It has no hands. It can't open a file or a web page by itself.</p></div>
+      <div class="card"><h4>The harness</h4><p>Your program around the model. It runs the loop, sends the message list to the model, reads the decision, checks the guards, calls the tool, and saves the result. Everything the agent "does" happens here.</p></div>
+      <div class="card"><h4>Tools</h4><p>Plain functions, such as <code>read_file(name)</code>. The harness gives the model each tool's name, a short description, and its inputs. The model picks a tool by reading those descriptions, so a vague description gets a tool used wrong.</p></div>
+      <div class="card"><h4>The message list</h4><p>The notepad from the 10k view. It holds the rules, the tool list, the goal, and every decision and result so far. The model rereads all of it on every step. This is the context window, and it has a fixed size limit.</p></div>
+      <div class="card"><h4>Guards</h4><p>Checks in the harness, not in the prompt: a step limit, a list of tools that need a person's approval, and rules such as "read a file before writing it". They hold even when the model is wrong or confused.</p></div>
+      <div class="card"><h4>Stop conditions</h4><p>The run ends when the model gives a final answer, the step limit hits, a guard stops it, or a person cancels it. "The model said it's done" is only one of these, and it isn't proof the work is right.</p></div>
+    </div>
+
+    <h3>One step, from start to finish</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 640 860" role="img" aria-label="Flow of one step: send messages to the model, the model returns a decision. If it's a final answer, stop and return it. Otherwise check guards. If a guard says no, the result is BLOCKED or REFUSED. If yes, the harness runs the tool. Either way, append the result to the messages. If steps are left, loop back. If not, stop unfinished.">
+        <rect class="box" x="140" y="20" width="360" height="64" rx="10"/>
+        <text class="lb" x="320" y="59" text-anchor="middle" style="font-size:19px">1. Send messages to the model</text>
+        <path class="ln t" d="M320,84 V110" marker-end="url(#ah)"/>
+        <rect class="box a" x="140" y="114" width="360" height="64" rx="10"/>
+        <text class="lb a" x="320" y="153" text-anchor="middle" style="font-size:19px">2. Model returns a decision</text>
+        <path class="ln t" d="M320,178 V200" marker-end="url(#ah)"/>
+        <polygon class="box" points="320,204 440,254 320,304 200,254"/>
+        <text class="lb" x="320" y="261" text-anchor="middle" style="font-size:18px">Final answer?</text>
+        <path class="ln a t" d="M440,254 H480" marker-end="url(#aha)"/>
+        <text class="lb a" x="460" y="242" text-anchor="middle" style="font-size:15px">yes</text>
+        <rect class="box a" x="484" y="222" width="146" height="64" rx="10"/>
+        <text class="lb a" x="557" y="250" text-anchor="middle" style="font-size:16px">Stop, return</text>
+        <text class="lb a" x="557" y="272" text-anchor="middle" style="font-size:16px">the answer</text>
+        <path class="ln t" d="M320,304 V330" marker-end="url(#ah)"/>
+        <text class="lb s" x="334" y="324" style="font-size:15px">no</text>
+        <polygon class="box" points="320,334 440,384 320,434 200,384"/>
+        <text class="lb" x="320" y="391" text-anchor="middle" style="font-size:18px">Guards OK?</text>
+        <path class="ln r t" d="M440,384 H480" marker-end="url(#ahr)"/>
+        <text class="lb r" x="460" y="372" text-anchor="middle" style="font-size:15px">no</text>
+        <rect class="box r" x="484" y="344" width="146" height="80" rx="10"/>
+        <text class="lb" x="557" y="374" text-anchor="middle" style="font-size:16px">Result is</text>
+        <text class="lb r" x="557" y="396" text-anchor="middle" style="font-size:16px">BLOCKED or</text>
+        <text class="lb r" x="557" y="416" text-anchor="middle" style="font-size:16px">REFUSED</text>
+        <path class="ln r t" d="M557,424 V582 H508" marker-end="url(#ahr)"/>
+        <path class="ln t" d="M320,434 V464" marker-end="url(#ah)"/>
+        <text class="lb s" x="334" y="456" style="font-size:15px">yes</text>
+        <rect class="box" x="140" y="468" width="360" height="56" rx="10"/>
+        <text class="lb" x="320" y="503" text-anchor="middle" style="font-size:19px">3. Harness runs the tool</text>
+        <path class="ln t" d="M320,524 V550" marker-end="url(#ah)"/>
+        <rect class="box a" x="140" y="554" width="360" height="56" rx="10"/>
+        <text class="lb a" x="320" y="589" text-anchor="middle" style="font-size:19px">4. Append result to messages</text>
+        <path class="ln t" d="M320,610 V636" marker-end="url(#ah)"/>
+        <polygon class="box" points="320,640 440,690 320,740 200,690"/>
+        <text class="lb" x="320" y="697" text-anchor="middle" style="font-size:18px">Steps left?</text>
+        <path class="ln t" d="M200,690 H90 V52 H136" marker-end="url(#ah)"/>
+        <text class="lb s" x="100" y="680" style="font-size:15px">yes</text>
+        <path class="ln r t" d="M320,740 V770" marker-end="url(#ahr)"/>
+        <text class="lb r" x="334" y="762" style="font-size:15px">no</text>
+        <rect class="box r" x="160" y="774" width="320" height="64" rx="10"/>
+        <text class="lb" x="320" y="812" text-anchor="middle" style="font-size:17px">Stop: out of steps, unfinished</text>
+      </svg>
+      <figcaption>One trip around this flow is one step, one lap of the racetrack. The model only takes part in box 2. A blocked action still becomes a result, so the model can see why and change course.</figcaption>
+    </figure>
+
+    <h3>What a tool call looks like</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 760 300" role="img" aria-label="Three cards. The tool description the harness shows the model. The decision the model writes back, naming the tool and arguments. The result the harness appends.">
+        <rect class="box f" x="20" y="40" width="230" height="250" rx="10"/>
+        <text class="lb" x="135" y="28" text-anchor="middle" style="font-size:17px">1. harness shows</text>
+        <text class="lb m" x="36" y="80" style="font-size:15px">name: read_file</text>
+        <text class="lb s" x="36" y="112" style="font-size:15px">does: return the text</text>
+        <text class="lb s" x="36" y="134" style="font-size:15px">of one file</text>
+        <text class="lb m" x="36" y="172" style="font-size:15px">inputs:</text>
+        <text class="lb m" x="36" y="196" style="font-size:15px">  name (text)</text>
+        <text class="lb s" x="36" y="250" style="font-size:14px">one card per tool</text>
+        <rect class="box a" x="265" y="40" width="230" height="250" rx="10"/>
+        <text class="lb a" x="380" y="28" text-anchor="middle" style="font-size:17px">2. model writes</text>
+        <text class="lb m" x="281" y="80" style="font-size:15px">{"tool":</text>
+        <text class="lb a m" x="281" y="104" style="font-size:15px">  "read_file",</text>
+        <text class="lb m" x="281" y="128" style="font-size:15px"> "args": {</text>
+        <text class="lb a m" x="281" y="152" style="font-size:15px">  "name":</text>
+        <text class="lb a m" x="281" y="176" style="font-size:15px">  "notes.txt"}}</text>
+        <text class="lb s" x="281" y="250" style="font-size:14px">just text. nothing runs</text>
+        <rect class="box" x="510" y="40" width="230" height="250" rx="10"/>
+        <text class="lb" x="625" y="28" text-anchor="middle" style="font-size:17px">3. harness appends</text>
+        <text class="lb m" x="526" y="80" style="font-size:15px">{"role": "tool",</text>
+        <text class="lb m" x="526" y="104" style="font-size:15px"> "content":</text>
+        <text class="lb m" x="526" y="128" style="font-size:15px">  "teh meeting</text>
+        <text class="lb m" x="526" y="152" style="font-size:15px">   is at 3pm"}</text>
+        <text class="lb s" x="526" y="250" style="font-size:14px">the model sees this next</text>
+      </svg>
+      <figcaption>Formats vary between tool-calling interfaces. The shape doesn't: a description in, a structured request out, a text result back.</figcaption>
+    </figure>
+
+    <h3>The context window, filling up</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 760 290" role="img" aria-label="A fixed-length bar. Rules and the goal take the first part. Each step adds a block. At the end, the bar is full. Below, three ways to handle a full window: drop old results, summarize old steps, or stop and report. Each has a risk.">
+        <text class="lb s" x="380" y="36" text-anchor="middle" style="font-size:16px">fixed size: the model can't read past the end</text>
+        <rect class="box" x="20" y="56" width="120" height="64" rx="6"/><text class="lb" x="80" y="95" text-anchor="middle" style="font-size:17px">rules</text>
+        <rect class="box a" x="140" y="56" width="80" height="64" rx="6"/><text class="lb a" x="180" y="95" text-anchor="middle" style="font-size:17px">goal</text>
+        <rect class="box" x="220" y="56" width="60" height="64" rx="6"/><text class="lb s" x="250" y="95" text-anchor="middle" style="font-size:17px">1</text>
+        <rect class="box" x="280" y="56" width="70" height="64" rx="6"/><text class="lb s" x="315" y="95" text-anchor="middle" style="font-size:17px">2</text>
+        <rect class="box" x="350" y="56" width="80" height="64" rx="6"/><text class="lb s" x="390" y="95" text-anchor="middle" style="font-size:17px">3</text>
+        <rect class="box" x="430" y="56" width="90" height="64" rx="6"/><text class="lb s" x="475" y="95" text-anchor="middle" style="font-size:17px">4</text>
+        <rect class="box" x="520" y="56" width="100" height="64" rx="6"/><text class="lb s" x="570" y="95" text-anchor="middle" style="font-size:17px">5</text>
+        <rect class="box r" x="620" y="56" width="120" height="64" rx="6"/><text class="lb r" x="680" y="95" text-anchor="middle" style="font-size:17px">full</text>
+        <rect class="box" x="20" y="170" width="230" height="90" rx="10"/>
+        <text class="lb" x="135" y="206" text-anchor="middle" style="font-size:17px">drop old results</text>
+        <text class="lb s" x="135" y="236" text-anchor="middle" style="font-size:15px">risk: forgets facts</text>
+        <rect class="box" x="265" y="170" width="230" height="90" rx="10"/>
+        <text class="lb" x="380" y="206" text-anchor="middle" style="font-size:17px">summarize old steps</text>
+        <text class="lb s" x="380" y="236" text-anchor="middle" style="font-size:15px">risk: loses detail</text>
+        <rect class="box" x="510" y="170" width="230" height="90" rx="10"/>
+        <text class="lb" x="625" y="206" text-anchor="middle" style="font-size:17px">stop and report</text>
+        <text class="lb s" x="625" y="236" text-anchor="middle" style="font-size:15px">risk: job unfinished</text>
+        <path class="ln r t d" d="M680,124 V160"/>
+      </svg>
+      <figcaption>Block sizes are illustrative. Later steps tend to be bigger because tool results, such as whole files, pile up. Real limits depend on the model.</figcaption>
+    </figure>
+
+    <h3>Side effects, by name</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Each step changes</th><th>Each step doesn't change</th></tr></thead>
+      <tbody>
+        <tr><td>The message list grows by one decision and one result.</td><td>Earlier messages, unless the harness trims or summarizes them.</td></tr>
+        <tr><td>The outside world, but only when the harness runs a tool that writes.</td><td>The model itself. It doesn't learn during the run.</td></tr>
+        <tr><td>One more model call: more waiting and more cost.</td><td>What the model can reach. It has no way to act except the tool list.</td></tr>
+        <tr><td>The step counter goes up by one.</td><td>Memory across sessions. A new run starts with an empty notepad unless the harness saves notes.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <!-- ===================================================== 1k -->
+  <section class="panel" role="tabpanel" id="v1k" aria-labelledby="t-v1k" hidden>
+    <p class="where"><b>What should we decide?</b> Read this if your team is about to let an agent do real work. The risks, the trade-offs, and what I'd do.</p>
+    <div class="card rec">
+      <p class="lead"><b>My call:</b> start every agent read-only, in a sandbox, with a step limit and a check that doesn't trust the agent's own "done". Require a person's yes for anything you can't undo or anything that leaves the sandbox. Widen permissions one tool at a time, and only after the checks pass on a fixed set of test tasks.</p>
+    </div>
+
+    <h3>Decision 1: agent, script, or one prompt?</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 720 420" role="img" aria-label="Decision flow. Can you list the steps ahead of time? Yes: write a script. No: does it need to look things up or act? No: use a single prompt. Yes: use an agent, with guards.">
+        <rect class="box" x="170" y="20" width="380" height="80" rx="12"/>
+        <text class="lb" x="360" y="54" text-anchor="middle" style="font-size:21px">Can you list the steps</text>
+        <text class="lb" x="360" y="82" text-anchor="middle" style="font-size:21px">ahead of time?</text>
+        <path class="ln" d="M220,100 L130,170" marker-end="url(#ah)"/>
+        <text class="lb s" x="150" y="130" text-anchor="end" style="font-size:19px">yes</text>
+        <rect class="box" x="20" y="174" width="230" height="96" rx="12"/>
+        <text class="lb" x="135" y="214" text-anchor="middle" style="font-size:21px">Write a script</text>
+        <text class="lb s" x="135" y="244" text-anchor="middle" style="font-size:16px">a model can fill one step</text>
+        <path class="ln" d="M500,100 L560,170" marker-end="url(#ah)"/>
+        <text class="lb s" x="550" y="130" style="font-size:19px">no</text>
+        <rect class="box" x="370" y="174" width="330" height="80" rx="12"/>
+        <text class="lb" x="535" y="208" text-anchor="middle" style="font-size:20px">Does it need to look</text>
+        <text class="lb" x="535" y="236" text-anchor="middle" style="font-size:20px">things up or act?</text>
+        <path class="ln" d="M460,254 L400,310" marker-end="url(#ah)"/>
+        <text class="lb s" x="420" y="282" text-anchor="end" style="font-size:19px">no</text>
+        <path class="ln a" d="M620,254 L640,310" marker-end="url(#aha)"/>
+        <text class="lb a" x="650" y="282" style="font-size:19px">yes</text>
+        <rect class="box" x="250" y="314" width="220" height="90" rx="12"/>
+        <text class="lb" x="360" y="352" text-anchor="middle" style="font-size:20px">Single prompt</text>
+        <text class="lb s" x="360" y="380" text-anchor="middle" style="font-size:16px">paste what it needs</text>
+        <rect class="box a" x="490" y="314" width="220" height="90" rx="12"/>
+        <text class="lb a" x="600" y="352" text-anchor="middle" style="font-size:20px">Agent,</text>
+        <text class="lb a" x="600" y="380" text-anchor="middle" style="font-size:20px">with guards</text>
+      </svg>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Single prompt</th><th>Script</th><th>Agent</th></tr></thead>
+      <tbody>
+        <tr><td>Steps</td><td>None. One answer.</td><td>Fixed. You wrote them.</td><td>Chosen at run time by the model.</td></tr>
+        <tr><td>Same result every run</td><td>Close, but not exact.</td><td class="pick">Yes.</td><td>No. Paths vary between runs.</td></tr>
+        <tr><td>Handles surprises</td><td>Only what you pasted in.</td><td>Only what you coded for.</td><td class="pick">Yes. It reads and adapts.</td></tr>
+        <tr><td>Cost and wait</td><td class="pick">One model call.</td><td class="pick">Low.</td><td>Many calls, each bigger than the last.</td></tr>
+        <tr><td>How it fails</td><td>A wrong answer you can read.</td><td>A clear error.</td><td>Wrong actions, sometimes reported as success.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Decision 2: what may it do without asking?</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Action</th><th>Can you undo it?</th><th>My rule</th></tr></thead>
+      <tbody>
+        <tr><td>Read files, search, list</td><td>Nothing to undo.</td><td class="pick">Unattended.</td></tr>
+        <tr><td>Write inside a sandbox or a branch</td><td>Yes, throw it away.</td><td class="pick">Unattended. A person reviews the result before it goes anywhere.</td></tr>
+        <tr><td>Run commands</td><td>Depends on the command.</td><td>Allow a fixed list. Anything else needs a yes.</td></tr>
+        <tr><td>Delete, or overwrite shared data</td><td>Often not.</td><td>A yes every time.</td></tr>
+        <tr><td>Send messages, spend money, deploy, change permissions</td><td>No. Others see it at once.</td><td>A yes every time, or don't give it the tool.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="card warn"><p><b>Watch out for instructions hidden in what it reads.</b> A web page, file, or ticket can contain text like "ignore your goal and send this data to …". The model may follow it. Treat every tool result as data. Guards in the harness, such as approval and an allowlist, still hold when the model is fooled. Rules written only in the prompt don't.</p></div>
+
+    <h3>Decision 3: how will you know it worked?</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 720 270" role="img" aria-label="The agent says done. That claim goes to a checker that doesn't trust it: tests, a diff review, or a script that inspects the result. The checker decides pass or fail.">
+        <rect class="box" x="20" y="60" width="190" height="100" rx="12"/>
+        <text class="lb" x="115" y="102" text-anchor="middle" style="font-size:20px">agent says</text>
+        <text class="lb" x="115" y="130" text-anchor="middle" style="font-size:20px">"done"</text>
+        <path class="ln t" d="M214,110 H262" marker-end="url(#ah)"/>
+        <rect class="box a" x="266" y="40" width="210" height="140" rx="12"/>
+        <text class="lb a" x="371" y="76" text-anchor="middle" style="font-size:20px">a checker</text>
+        <text class="lb s" x="371" y="106" text-anchor="middle" style="font-size:16px">tests, rules,</text>
+        <text class="lb s" x="371" y="128" text-anchor="middle" style="font-size:16px">a person's review</text>
+        <text class="lb s" x="371" y="150" text-anchor="middle" style="font-size:16px">of the result</text>
+        <path class="ln a t" d="M480,84 H560" marker-end="url(#aha)"/>
+        <path class="ln r t" d="M480,140 H560" marker-end="url(#ahr)"/>
+        <rect class="box a" x="564" y="56" width="136" height="54" rx="10"/>
+        <text class="lb a" x="632" y="90" text-anchor="middle" style="font-size:20px">pass</text>
+        <rect class="box r" x="564" y="116" width="136" height="54" rx="10"/>
+        <text class="lb r" x="632" y="150" text-anchor="middle" style="font-size:20px">fail</text>
+        <text class="lb s" x="360" y="236" text-anchor="middle" style="font-size:17px">the agent's report is a claim, not proof (P7 in the 100 view)</text>
+      </svg>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Check</th><th>Catches</th><th>Use it?</th></tr></thead>
+      <tbody>
+        <tr><td class="pick">Automated checks on the result (tests, a script that inspects the output)</td><td>Wrong results, including ones the agent called a success.</td><td class="pick">Yes, on every run.</td></tr>
+        <tr><td class="pick">A fixed set of test tasks with known good answers (evals)</td><td>Changes to the prompt, tools, or model that quietly make it worse.</td><td class="pick">Yes, before every change ships.</td></tr>
+        <tr><td>A person reviews the diff or result</td><td>Things no check covers.</td><td>Yes, until the checks earn trust.</td></tr>
+        <tr><td>Read the message list after a bad run</td><td>Where it went wrong: a bad read, a misunderstood goal, a blocked tool.</td><td>When something fails. Keep the logs.</td></tr>
+        <tr><td>Trust the agent's own summary</td><td>Nothing on its own.</td><td>No.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Decision 4: how much context to give it?</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Amount</th><th>What happens</th><th>Pick?</th></tr></thead>
+      <tbody>
+        <tr><td>Too little</td><td>It guesses. It writes without reading (P6), or wanders and burns steps looking around.</td><td>No.</td></tr>
+        <tr><td class="pick">The goal, what "done" means, where to look, and what not to touch</td><td>It reads the rest with tools when it needs it.</td><td class="pick">Yes.</td></tr>
+        <tr><td>Everything you have, pasted in</td><td>The notepad fills early, every step costs more, and the key facts get buried.</td><td>No.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Decision 5: step limits and budget</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 720 330" role="img" aria-label="Bar chart from the demo script's runaway run. Characters sent to the model at each of six calls: 52, 230, 408, 586, 764, 942. Total 2,982.">
+        <text class="lb s" x="20" y="30" style="font-size:16px">characters sent to the model, per call (demo script, runaway run)</text>
+        <path class="ln t" d="M70,270 H700"/>
+        <rect class="box a" x="90" y="263" width="70" height="7"/>
+        <rect class="box a" x="190" y="241" width="70" height="29"/>
+        <rect class="box a" x="290" y="219" width="70" height="51"/>
+        <rect class="box a" x="390" y="197" width="70" height="73"/>
+        <rect class="box a" x="490" y="175" width="70" height="95"/>
+        <rect class="box a" x="590" y="152" width="70" height="118"/>
+        <text class="lb m" x="125" y="253" text-anchor="middle" style="font-size:15px">52</text>
+        <text class="lb m" x="225" y="231" text-anchor="middle" style="font-size:15px">230</text>
+        <text class="lb m" x="325" y="209" text-anchor="middle" style="font-size:15px">408</text>
+        <text class="lb m" x="425" y="187" text-anchor="middle" style="font-size:15px">586</text>
+        <text class="lb m" x="525" y="165" text-anchor="middle" style="font-size:15px">764</text>
+        <text class="lb m" x="625" y="142" text-anchor="middle" style="font-size:15px">942</text>
+        <text class="lb s" x="125" y="296" text-anchor="middle" style="font-size:15px">call 1</text>
+        <text class="lb s" x="225" y="296" text-anchor="middle" style="font-size:15px">2</text>
+        <text class="lb s" x="325" y="296" text-anchor="middle" style="font-size:15px">3</text>
+        <text class="lb s" x="425" y="296" text-anchor="middle" style="font-size:15px">4</text>
+        <text class="lb s" x="525" y="296" text-anchor="middle" style="font-size:15px">5</text>
+        <text class="lb s" x="625" y="296" text-anchor="middle" style="font-size:15px">6</text>
+        <text class="lb a" x="90" y="80" style="font-size:19px">total: 2,982 characters over 6 calls</text>
+        <text class="lb s" x="90" y="106" style="font-size:16px">6 copies of call 1 would be 312</text>
+      </svg>
+      <figcaption>Real output from <code>agent_loop.py runaway</code> (P4). Characters stand in for tokens. Real tool results, such as whole files, are usually bigger, so the gap grows faster. Some interfaces cache repeated input, which can lower the price. The model still works through the whole list.</figcaption>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th>Setting</th><th>Trade-off</th><th>My rule</th></tr></thead>
+      <tbody>
+        <tr><td>Step limit</td><td>Too low stops good runs. Too high lets a stuck run burn money.</td><td class="pick">Set it from the task. When it hits, stop and report what's done, don't retry blindly.</td></tr>
+        <tr><td>Repeated identical calls</td><td>A stuck agent can repeat the same call, like the stub in P4.</td><td class="pick">Stop after the same call with the same result a few times in a row.</td></tr>
+        <tr><td>Size of tool results</td><td>Whole files and long logs fill the notepad fast.</td><td class="pick">Return only what's needed: a page, a match, a summary line.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>What could go wrong</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Risk</th><th>What happens</th><th>Do this</th></tr></thead>
+      <tbody>
+        <tr><td>Runaway loop</td><td>Steps burn, nothing changes.</td><td>Step limit and a repeat check (P4).</td></tr>
+        <tr><td>Acting on a stale read</td><td>It overwrites someone else's change and reports success.</td><td>Check the version before writing (P7).</td></tr>
+        <tr><td>Writing without reading</td><td>It guesses what a file says.</td><td>Refuse writes to files it hasn't read (P6).</td></tr>
+        <tr><td>Risky action</td><td>Deletes, sends, or spends without anyone seeing.</td><td>Approval gate in the harness (P5).</td></tr>
+        <tr><td>Says "done" when it isn't</td><td>You ship a wrong result.</td><td>An independent check on the result (P7).</td></tr>
+        <tr><td>Instructions hidden in what it reads</td><td>It follows the text instead of your goal.</td><td>Treat results as data. Keep the permission rules in the harness.</td></tr>
+        <tr><td>Notepad fills up</td><td>It forgets the goal or early facts.</td><td>Keep the goal pinned, summarize old steps, and return smaller results.</td></tr>
+        <tr><td>Vague goal</td><td>It does the wrong thing well.</td><td>Write what "done" looks like before you start.</td></tr>
+        <tr><td>Tool error read as success</td><td>It carries on from a failed step.</td><td>Return clear error text, such as "ERROR:" or "REFUSED:".</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>The plan</h3>
+    <ol>
+      <li>Write the goal and what "done" means. If you can list the steps, write a script instead.</li>
+      <li>Give it read-only tools in a sandbox. Set a step limit.</li>
+      <li>Write a checker for the result and a small set of test tasks with known good answers.</li>
+      <li>Add write tools that refuse unread or changed files. Add an approval gate for anything you can't undo.</li>
+      <li>Run the test tasks after every change to the prompt, tools, or model. Read the message list of every failure.</li>
+      <li>Widen permissions one tool at a time, only after the checks keep passing.</li>
+    </ol>
+  </section>
+
+  <!-- ===================================================== 100 -->
+  <section class="panel" role="tabpanel" id="v100" aria-labelledby="t-v100" hidden>
+    <p class="where"><b>Prove it.</b> Read this to check any claim above. Each proof is a command you can run, with the output to expect.</p>
+    <p class="lead">Every proof runs one script, <a href="agent_loop.py"><code>agent_loop.py</code></a>, with Python 3 and nothing else: no network, no API key, no packages. A stub function stands in for the model, so <b>the output is the same on every run</b>. The stub proves the mechanics: the loop, the harness, and the guards. It doesn't prove how well a real model behaves.</p>
+
+    <h3>Claims and where they're proven</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Claim (tab)</th><th>Proof</th></tr></thead>
+      <tbody>
+        <tr><td>An agent loops: think, act, look, until it's done (10k, 5k)</td><td><span class="tag">P1</span></td></tr>
+        <tr><td>The model only returns decisions; only the harness runs tools (10k, 5k)</td><td><span class="tag">P2</span></td></tr>
+        <tr><td>Each step adds to the message list, so the context grows (10k, 5k)</td><td><span class="tag">P3</span></td></tr>
+        <tr><td>A step limit stops a runaway loop; cost grows faster than steps (10k, 1k)</td><td><span class="tag">P4</span></td></tr>
+        <tr><td>Risky actions are blocked until a person approves (10k, 5k, 1k)</td><td><span class="tag">P5</span></td></tr>
+        <tr><td>Read-before-write stops blind guesses (10k, 1k)</td><td><span class="tag">P6</span></td></tr>
+        <tr><td>A stale read overwrites others' work, and the agent still says "done" (10k, 1k)</td><td><span class="tag">P7</span></td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="proof">
+      <h3>Setup: the whole script</h3>
+      <p class="claim">Save it as <code>agent_loop.py</code>, or download it from this folder. Run <code>python3 agent_loop.py</code> with a scenario name: <code>happy</code>, <code>runaway</code>, <code>risky</code>, <code>blind</code>, or <code>stale</code>. Each line marked <code># think</code>, <code># act</code>, or <code># observe</code> is one part of the loop.</p>
+<pre><code>#!/usr/bin/env python3
+"""A tiny AI agent loop with a fake model. Standard library only.
+
+Run:  python3 agent_loop.py [happy|runaway|risky|blind|stale] [--approve] [--no-guard]
+
+The "model" is a stub: fixed rules that pick the next step by reading
+the message list. A real agent swaps in a call to a language model.
+The loop, the tools, and the guards stay the same.
+"""
+import json
+import sys
+
+MAX_STEPS = 6                     # guard: the loop stops here, no matter what
+NEEDS_APPROVAL = {"delete_file"}  # guard: a person must say yes first
+READ_BEFORE_WRITE = True          # guard: refuse writes to unread files
+
+
+# The world the agent works in: a pretend folder of files.
+def make_files():
+    return {
+        "notes.txt": {"text": "teh meeting is at 3pm", "version": 1},
+        "old.txt": {"text": "draft from last year", "version": 1},
+    }
+
+
+# Tools are plain functions. Only the harness calls them.
+def list_files(files, seen):
+    return ", ".join(sorted(files))
+
+
+def read_file(files, seen, name):
+    if name not in files:
+        return f"ERROR: no file named {name}"
+    seen[name] = files[name]["version"]  # remember which version we saw
+    return files[name]["text"]
+
+
+def write_file(files, seen, name, text):
+    current = files.get(name, {"version": 0})["version"]
+    if READ_BEFORE_WRITE and seen.get(name) != current:
+        return f"REFUSED: {name} changed or was never read. Read it first."
+    files[name] = {"text": text, "version": current + 1}
+    seen[name] = current + 1
+    return f"wrote {len(text)} characters to {name}"
+
+
+def delete_file(files, seen, name):
+    files.pop(name, None)
+    return f"deleted {name}"
+
+
+TOOLS = {"list_files": list_files, "read_file": read_file,
+         "write_file": write_file, "delete_file": delete_file}
+
+GOALS = {
+    "happy": "Fix the typo in notes.txt.",
+    "blind": "Fix the typo in notes.txt.",
+    "stale": "Fix the typo in notes.txt.",
+    "runaway": "Tidy up the folder.",
+    "risky": "Tidy up the folder.",
+}
+
+
+def call(thought, tool, **args):
+    return {"thought": thought, "tool": tool, "args": args}
+
+
+def done(text):
+    return {"thought": "Nothing left to do.", "final": text}
+
+
+# The stub "model". It only returns a decision. It can't run anything.
+def fake_model(messages, scenario):
+    results = [m["content"] for m in messages if m["role"] == "tool"]
+    last = results[-1] if results else ""
+    if scenario == "runaway":  # never decides it's finished
+        return call("Let me check the folder again.", "list_files")
+    if scenario == "risky":
+        if not results:
+            return call("old.txt looks like clutter.", "delete_file", name="old.txt")
+        if last.startswith("BLOCKED"):
+            return done("I did not delete old.txt. It needs your approval.")
+        return done("Deleted old.txt.")
+    # happy, blind, stale: fix the typo
+    if not results:
+        if scenario == "blind":  # skips reading and guesses the contents
+            return call("I bet it says 'teh meeting'.", "write_file",
+                        name="notes.txt", text="the meeting is at 3pm")
+        return call("Look around first.", "list_files")
+    if last.startswith("REFUSED") or "notes.txt," in last:
+        return call("Read the file.", "read_file", name="notes.txt")
+    if "teh" in last:
+        return call("Fix 'teh'.", "write_file",
+                    name="notes.txt", text=last.replace("teh", "the"))
+    return done("Fixed the typo in notes.txt.")
+
+
+# The harness: runs the loop, runs the tools, enforces the guards.
+def run(scenario, approve=False):
+    files, seen = make_files(), {}
+    messages = [{"role": "user", "content": GOALS[scenario]}]
+    sent = 0
+    print(f"goal: {GOALS[scenario]}")
+    for step in range(1, MAX_STEPS + 1):
+        sent += len(json.dumps(messages))  # the model rereads everything
+        decision = fake_model(messages, scenario)                 # think
+        messages.append({"role": "assistant", "content": json.dumps(decision)})
+        print(f"step {step} | think: {decision['thought']}")
+        if "final" in decision:
+            print(f"       | done:  {decision['final']}")
+            break
+        name, args = decision["tool"], decision["args"]
+        shown = ", ".join(f"{k}={v!r}" for k, v in args.items())
+        if name not in TOOLS:
+            result = f"ERROR: no tool named {name}"
+        elif name in NEEDS_APPROVAL and not approve:
+            result = f"BLOCKED: {name} needs a person's approval"
+        else:
+            result = TOOLS[name](files, seen, **args)              # act
+        messages.append({"role": "tool", "content": result})      # observe
+        print(f"       | act:   {name}({shown})")
+        print(f"       | see:   {result}")
+        print(f"       | context: {len(messages)} messages, "
+              f"{len(json.dumps(messages))} chars")
+        if scenario == "stale" and name == "read_file" and seen["notes.txt"] == 1:
+            files["notes.txt"] = {"text": "teh meeting is at 4pm", "version": 2}
+            print("       | (meanwhile, a teammate changes 3pm to 4pm)")
+    else:
+        print(f"STOPPED: hit the {MAX_STEPS}-step limit without finishing")
+    print(f"model calls: {step} | chars sent to the model in total: {sent}")
+    print(f"files now: {json.dumps({k: v['text'] for k, v in files.items()})}")
+
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    if "--no-guard" in args:
+        READ_BEFORE_WRITE = False
+    words = [a for a in args if not a.startswith("--")]
+    run(words[0] if words else "happy", approve="--approve" in args)</code></pre>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P1</span>The loop: think, act, look, until done</h3>
+      <p class="claim">The goal is to fix a typo. The agent looks around, reads the file, writes the fix, then stops by itself.</p>
+<pre><code>python3 agent_loop.py happy</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>goal: Fix the typo in notes.txt.
+step 1 | think: Look around first.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 3 messages, 225 chars
+step 2 | think: Read the file.
+       | act:   read_file(name='notes.txt')
+       | see:   teh meeting is at 3pm
+       | context: 5 messages, 412 chars
+step 3 | think: Fix 'teh'.
+       | act:   write_file(name='notes.txt', text='the meeting is at 3pm')
+       | see:   wrote 21 characters to notes.txt
+       | context: 7 messages, 644 chars
+step 4 | think: Nothing left to do.
+       | done:  Fixed the typo in notes.txt.
+model calls: 4 | chars sent to the model in total: 1340
+files now: {"notes.txt": "the meeting is at 3pm", "old.txt": "draft from last year"}</code></pre>
+      <p class="look">Look at: four model calls, three tool calls. Step 4 has no <code>act</code> line: the model gave a final answer, so the loop ended. The last line shows the file really changed.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P2</span>The model only asks; the harness runs the tools</h3>
+      <p class="claim">If the model could run tools, <code>fake_model</code> would call them. It never does. The only line that runs a tool is inside <code>run</code>, the harness.</p>
+<pre><code>grep -n "^def \|TOOLS" agent_loop.py</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>19:def make_files():
+27:def list_files(files, seen):
+31:def read_file(files, seen, name):
+38:def write_file(files, seen, name, text):
+47:def delete_file(files, seen, name):
+52:TOOLS = {"list_files": list_files, "read_file": read_file,
+64:def call(thought, tool, **args):
+68:def done(text):
+73:def fake_model(messages, scenario):
+99:def run(scenario, approve=False):
+114:        if name not in TOOLS:
+119:            result = TOOLS[name](files, seen, **args)              # act</code></pre>
+      <p class="look">Look at: <code>fake_model</code> starts at line 73 and <code>run</code> at line 99. Both <code>TOOLS</code> lookups, lines 114 and 119, sit inside <code>run</code>. <code>fake_model</code> only returns dicts built by <code>call</code> and <code>done</code>. Swap it for a real model and this split stays the same.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P3</span>The context grows every step</h3>
+      <p class="claim">From the P1 output: each step appends one decision and one result.</p>
+      <figure class="fig">
+        <svg viewBox="0 0 720 215" role="img" aria-label="The message list after steps 1, 2, and 3 of the happy run: 3 messages and 225 characters, then 5 and 412, then 7 and 644.">
+          <text class="lb s" x="20" y="30" style="font-size:16px">message list after each step (P1, happy run)</text>
+          <rect class="box a" x="150" y="56" width="124" height="38" rx="4"/>
+          <rect class="box a" x="150" y="106" width="227" height="38" rx="4"/>
+          <rect class="box a" x="150" y="156" width="354" height="38" rx="4"/>
+          <text class="lb" x="20" y="82" style="font-size:17px">step 1</text>
+          <text class="lb" x="20" y="132" style="font-size:17px">step 2</text>
+          <text class="lb" x="20" y="182" style="font-size:17px">step 3</text>
+          <text class="lb m" x="286" y="82" style="font-size:15px">3 msgs, 225 chars</text>
+          <text class="lb m" x="389" y="132" style="font-size:15px">5 msgs, 412 chars</text>
+          <text class="lb m" x="516" y="182" style="font-size:15px">7 msgs, 644 chars</text>
+        </svg>
+      </figure>
+      <p class="look">Look at: the count goes 3, 5, 7. It never shrinks, because this harness never trims. The model reads all of it again on the next call.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P4</span>A step limit stops a runaway loop</h3>
+      <p class="claim">This stub never decides it's done. It checks the folder over and over.</p>
+<pre><code>python3 agent_loop.py runaway</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>goal: Tidy up the folder.
+step 1 | think: Let me check the folder again.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 3 messages, 230 chars
+step 2 | think: Let me check the folder again.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 5 messages, 408 chars
+step 3 | think: Let me check the folder again.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 7 messages, 586 chars
+step 4 | think: Let me check the folder again.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 9 messages, 764 chars
+step 5 | think: Let me check the folder again.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 11 messages, 942 chars
+step 6 | think: Let me check the folder again.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 13 messages, 1120 chars
+STOPPED: hit the 6-step limit without finishing
+model calls: 6 | chars sent to the model in total: 2982
+files now: {"notes.txt": "teh meeting is at 3pm", "old.txt": "draft from last year"}</code></pre>
+      <p class="look">Look at: the same call six times, no progress, and the harness stops it at <code>MAX_STEPS</code>. Without that line, this loop never ends.</p>
+      <p class="claim">Where the 2,982 total comes from: the first call sends only the goal. Each later call sends the list as it stood after the step before.</p>
+<pre><code>python3 -c "import json;print(len(json.dumps([{'role':'user','content':'Tidy up the folder.'}])))"
+python3 -c "print(52+230+408+586+764+942, 6*52)"</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>52
+2982 312</code></pre>
+      <p class="look">Look at: 2,982 characters for six calls, versus 312 if each call cost what the first one did. That's the chart in the 1k view.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P5</span>A risky action waits for a person</h3>
+      <p class="claim"><code>delete_file</code> is in <code>NEEDS_APPROVAL</code>. Without <code>--approve</code>, the harness doesn't run it and tells the model why.</p>
+<pre><code>python3 agent_loop.py risky</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>goal: Tidy up the folder.
+step 1 | think: old.txt looks like clutter.
+       | act:   delete_file(name='old.txt')
+       | see:   BLOCKED: delete_file needs a person's approval
+       | context: 3 messages, 277 chars
+step 2 | think: Nothing left to do.
+       | done:  I did not delete old.txt. It needs your approval.
+model calls: 2 | chars sent to the model in total: 329
+files now: {"notes.txt": "teh meeting is at 3pm", "old.txt": "draft from last year"}</code></pre>
+<pre><code>python3 agent_loop.py risky --approve</code></pre>
+<pre class="out"><code>goal: Tidy up the folder.
+step 1 | think: old.txt looks like clutter.
+       | act:   delete_file(name='old.txt')
+       | see:   deleted old.txt
+       | context: 3 messages, 246 chars
+step 2 | think: Nothing left to do.
+       | done:  Deleted old.txt.
+model calls: 2 | chars sent to the model in total: 298
+files now: {"notes.txt": "teh meeting is at 3pm"}</code></pre>
+      <p class="look">Look at: the model asked to delete both times. Only the harness flag changed the outcome. The block also came back as a result, so the model could report it instead of claiming success.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P6</span>Read before write stops a blind guess</h3>
+      <p class="claim">This stub skips reading and writes what it assumes the file says.</p>
+<pre><code>python3 agent_loop.py blind</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>goal: Fix the typo in notes.txt.
+step 1 | think: I bet it says 'teh meeting'.
+       | act:   write_file(name='notes.txt', text='the meeting is at 3pm')
+       | see:   REFUSED: notes.txt changed or was never read. Read it first.
+       | context: 3 messages, 337 chars
+step 2 | think: Read the file.
+       | act:   read_file(name='notes.txt')
+       | see:   teh meeting is at 3pm
+       | context: 5 messages, 524 chars
+step 3 | think: Fix 'teh'.
+       | act:   write_file(name='notes.txt', text='the meeting is at 3pm')
+       | see:   wrote 21 characters to notes.txt
+       | context: 7 messages, 756 chars
+step 4 | think: Nothing left to do.
+       | done:  Fixed the typo in notes.txt.
+model calls: 4 | chars sent to the model in total: 1676
+files now: {"notes.txt": "the meeting is at 3pm", "old.txt": "draft from last year"}</code></pre>
+      <p class="look">Look at: the guess happened to be right here. The guard refused it anyway, because the harness can't tell a lucky guess from a wrong one. The refusal costs one extra step.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P7</span>A stale read, with and without the guard</h3>
+      <p class="claim">The agent reads the file. Then a teammate changes 3pm to 4pm. Then the agent writes its fix based on the old read.</p>
+<pre><code>python3 agent_loop.py stale</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>goal: Fix the typo in notes.txt.
+step 1 | think: Look around first.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 3 messages, 225 chars
+step 2 | think: Read the file.
+       | act:   read_file(name='notes.txt')
+       | see:   teh meeting is at 3pm
+       | context: 5 messages, 412 chars
+       | (meanwhile, a teammate changes 3pm to 4pm)
+step 3 | think: Fix 'teh'.
+       | act:   write_file(name='notes.txt', text='the meeting is at 3pm')
+       | see:   REFUSED: notes.txt changed or was never read. Read it first.
+       | context: 7 messages, 672 chars
+step 4 | think: Read the file.
+       | act:   read_file(name='notes.txt')
+       | see:   teh meeting is at 4pm
+       | context: 9 messages, 859 chars
+step 5 | think: Fix 'teh'.
+       | act:   write_file(name='notes.txt', text='the meeting is at 4pm')
+       | see:   wrote 21 characters to notes.txt
+       | context: 11 messages, 1091 chars
+step 6 | think: Nothing left to do.
+       | done:  Fixed the typo in notes.txt.
+model calls: 6 | chars sent to the model in total: 3318
+files now: {"notes.txt": "the meeting is at 4pm", "old.txt": "draft from last year"}</code></pre>
+<pre><code>python3 agent_loop.py stale --no-guard</code></pre>
+<pre class="out"><code>goal: Fix the typo in notes.txt.
+step 1 | think: Look around first.
+       | act:   list_files()
+       | see:   notes.txt, old.txt
+       | context: 3 messages, 225 chars
+step 2 | think: Read the file.
+       | act:   read_file(name='notes.txt')
+       | see:   teh meeting is at 3pm
+       | context: 5 messages, 412 chars
+       | (meanwhile, a teammate changes 3pm to 4pm)
+step 3 | think: Fix 'teh'.
+       | act:   write_file(name='notes.txt', text='the meeting is at 3pm')
+       | see:   wrote 21 characters to notes.txt
+       | context: 7 messages, 644 chars
+step 4 | think: Nothing left to do.
+       | done:  Fixed the typo in notes.txt.
+model calls: 4 | chars sent to the model in total: 1340
+files now: {"notes.txt": "the meeting is at 3pm", "old.txt": "draft from last year"}</code></pre>
+      <p class="look">Look at the last two lines of the second run: the agent says <b>"Fixed the typo"</b>, and the file says <b>3pm</b>. The teammate's 4pm is gone. The agent's report is true about the typo and silent about the damage. That's why the 1k view says to check the result, not the report.</p>
+    </div>
+
+    <div class="card warn"><p><b>What this script doesn't prove.</b> How often a real model picks the right tool, writes good arguments, or gets fooled by text it reads. Real token counts, prices, and wait times. A stub can only show what the harness guarantees. For model behavior, run your own test tasks against your own model (Decision 3 in the 1k view).</p></div>
+
+    <h3>Alternatives considered</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Alternative</th><th>Why not the default</th></tr></thead>
+      <tbody>
+        <tr><td>Single prompt with everything pasted in</td><td>Best when no lookups or actions are needed. Can't adapt to what it finds.</td></tr>
+        <tr><td>Fixed script, maybe with one model call inside</td><td>Best when you can list the steps. Cheaper and the same every run.</td></tr>
+        <tr><td>Agent with approval on every step</td><td>Safe, but slow. People start approving without reading.</td></tr>
+        <tr><td>Fully unattended agent from day one</td><td>Fastest, but mistakes land before anyone sees them.</td></tr>
+        <tr><td>Several agents that split the work</td><td>More calls, more hand-offs between notepads, and more places to check. Start with one.</td></tr>
+        <tr><td>Guard rules written only in the prompt</td><td>The model can ignore or be talked out of them. Put guards in the harness (P2, P5).</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</main>
+</div>
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('[role="tab"]'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls');});
+  function show(id){tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;document.getElementById(t.getAttribute('aria-controls')).hidden=!on;});}
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){var id=t.getAttribute('aria-controls');show(id);try{history.replaceState(null,'','#'+id)}catch(e){}toArtifact();});
+    t.addEventListener('keydown',function(e){var d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(!d)return;e.preventDefault();var n=tabs[(i+d+tabs.length)%tabs.length];n.focus();n.click();});
+  });
+  // Scroll to the top of the artifact: page top on wide screens, below the chat on phones.
+  function toArtifact(){var a=document.getElementById('artifact');window.scrollTo(0,Math.max(0,a.getBoundingClientRect().top+window.scrollY-8));}
+  document.querySelectorAll('[data-open]').forEach(function(l){l.addEventListener('click',function(e){e.preventDefault();show('v10k');toArtifact();document.getElementById('t-v10k').focus();});});
+  function fromHash(){var h=(location.hash||'').slice(1);show(ids.indexOf(h)>-1?h:'v10k');}
+  window.addEventListener('hashchange',fromHash);
+  fromHash();
+})();
+</script>
+</body>
+</html>
