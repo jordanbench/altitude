@@ -1,0 +1,18 @@
+{
+  "name": "altitude",
+  "owner": {
+    "name": "Jordan Bench"
+  },
+  "metadata": {
+    "description": "Altitude: get any agent answer at four reading depths, as tabs on one page."
+  },
+  "plugins": [
+    {
+      "name": "altitude",
+      "description": "Get any agent answer as one HTML page with four tabs: a 10k, 5k, 1k, and 100 view of the same topic. Read only as deep as you need.",
+      "version": "1.2.0",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

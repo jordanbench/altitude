@@ -1,0 +1,962 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>git rebase, at altitude</title>
+<meta name="description" content="An example of the altitude skill: what happens when you run git rebase, at four reading depths.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f6f8;--surface:#fff;--ink:#16202b;--muted:#5a6675;--faint:#9aa5b1;--line:#dbe1e7;--accent:#0b6e8a;--accent-soft:#dcedf2;--stop:#c2362b;--stop-soft:#f8e1de;--code:#eef1f4;color-scheme:light}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#10161c;--surface:#171f27;--ink:#e5eaf0;--muted:#95a2b0;--faint:#5c6875;--line:#29333e;--accent:#5cc2de;--accent-soft:#16303a;--stop:#ef6b5f;--stop-soft:#3a1d1a;--code:#0c1217;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10161c;--surface:#171f27;--ink:#e5eaf0;--muted:#95a2b0;--faint:#5c6875;--line:#29333e;--accent:#5cc2de;--accent-soft:#16303a;--stop:#ef6b5f;--stop-soft:#3a1d1a;--code:#0c1217;color-scheme:dark}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 "Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;overflow-wrap:break-word}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:28px 64px}
+h1{margin:0;font-size:clamp(30px,6vw,46px);line-height:1.1}
+h1 code{font-size:.9em}
+.sub{margin:8px 0 18px;color:var(--muted)}
+h3{margin:12px 0 0;font-size:22px;line-height:1.25}
+h4{margin:6px 0 0;font-size:18px}
+p{margin:0}
+a{color:var(--accent)}
+code,pre,kbd{font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+:not(pre)>code{font-size:.88em;background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:2;background:var(--bg);display:flex;gap:8px;flex-wrap:wrap;padding-block:10px;border-bottom:1px solid var(--line)}
+.tabs button{font:600 13px/1 "JetBrains Mono",ui-monospace,monospace;padding:9px 13px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{display:flex;flex-direction:column;gap:20px;padding-top:24px;min-width:0}
+.panel>*{min-width:0}
+.fig{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px}
+.fig svg{display:block;width:100%;height:auto}
+.fig figcaption{margin-top:8px;font-size:15px;color:var(--muted)}
+figure{margin:0}
+.tbl{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+td.pick{color:var(--accent);font-weight:700}
+.where{margin:0;padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;font-size:16px}
+.lead{font-size:20px;line-height:1.45}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:grid;gap:10px}
+.card.rec{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.card.warn{border-color:var(--stop);box-shadow:inset 4px 0 0 var(--stop)}
+ul,ol{margin:0;padding-left:22px}
+li{margin:4px 0}
+.parts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.parts .card h4{margin:0;color:var(--accent)}
+pre{margin:0;overflow-x:auto;max-width:100%;background:var(--code);border:1px solid var(--line);border-radius:8px;padding:12px 14px;font-size:13.5px;line-height:1.55;white-space:pre}
+pre.out{background:var(--surface);border-style:dashed}
+.lbl{font:600 12px/1 "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:-4px}
+.proof{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;display:grid;gap:12px;min-width:0}
+.proof h3{margin:0;font-size:20px}
+.proof .claim{color:var(--muted);font-size:15px}
+.tag{display:inline-block;font:700 12px/1 "JetBrains Mono",monospace;background:var(--accent);color:var(--bg);border-radius:4px;padding:4px 6px;margin-right:6px;vertical-align:2px}
+.look{font-size:15px;border-left:3px solid var(--accent);padding-left:10px}
+/* 10k view: one idea per pane, a big picture, a few words */
+.pane{background:var(--surface);border-radius:18px;padding:26px;display:grid;gap:16px;min-width:0}
+.pane h2{margin:0;font-size:clamp(28px,5vw,42px);line-height:1.08;text-wrap:balance}
+.pane p{margin:0;font-size:19px;line-height:1.45;max-width:52ch;color:var(--muted)}
+.pane .pic{background:var(--bg);border-radius:12px;padding:12px;min-width:0}
+.pane svg{display:block;width:100%;height:auto}
+.pane .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* SVG vocabulary */
+svg text{font-family:"Atkinson Hyperlegible",system-ui,sans-serif}
+.lb{font-weight:700;font-size:24px;fill:var(--ink)}
+.lb.s{font-size:19px;font-weight:400;fill:var(--muted)}
+.lb.h{font-size:40px}
+.lb.a{fill:var(--accent)}
+.lb.r{fill:var(--stop)}
+.lb.w{fill:#fff}
+.lb.m{font-family:"JetBrains Mono",monospace;font-weight:600}
+.ties{fill:none;stroke:var(--line);stroke-width:28;stroke-dasharray:5 15}
+.rl{fill:none;stroke:var(--faint);stroke-width:7;stroke-linecap:round}
+.rl.a{stroke:var(--accent)}
+.rl.g{stroke-dasharray:4 10;opacity:.8}
+.bead{fill:var(--surface);stroke:var(--muted);stroke-width:5}
+.bead.a{fill:var(--accent);stroke:var(--accent)}
+.bead.r{fill:var(--stop);stroke:var(--stop)}
+.bead.g{fill:none;stroke:var(--faint);stroke-dasharray:6 5}
+.box{fill:var(--surface);stroke:var(--muted);stroke-width:3}
+.box.a{fill:var(--accent-soft);stroke:var(--accent)}
+.box.r{fill:var(--stop-soft);stroke:var(--stop)}
+.box.g{fill:none;stroke:var(--faint);stroke-dasharray:7 6}
+.box.f{fill:var(--bg)}
+.ln{fill:none;stroke:var(--muted);stroke-width:4;stroke-linecap:round}
+.ln.a{stroke:var(--accent)}
+.ln.r{stroke:var(--stop)}
+.ln.t{stroke-width:2.5}
+.ln.d{stroke-dasharray:6 6}
+.fa{fill:var(--accent)}
+.fm{fill:var(--muted)}
+.ff{fill:var(--faint)}
+.fr{fill:var(--stop)}
+.fs{fill:var(--surface)}
+.fb{fill:var(--bg)}
+.mk{fill:var(--muted)}
+.mk.a{fill:var(--accent)}
+.mk.r{fill:var(--stop)}
+@media (max-width:640px){.pane{padding:16px}.pane .two{grid-template-columns:1fr}.pane p{font-size:17px}body{font-size:16px}.lead{font-size:18px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path class="mk" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="aha" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path class="mk a" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="ahr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path class="mk r" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1><code>git rebase</code>, at altitude</h1>
+  <p class="sub">An example of the altitude skill. Start on the 10k view; go deeper only if you need to.</p>
+
+  <div class="tabs" role="tablist" aria-label="Altitude">
+    <button role="tab" id="t-v10k" aria-controls="v10k" aria-selected="true">10k view</button>
+    <button role="tab" id="t-v5k" aria-controls="v5k" aria-selected="false">5k view</button>
+    <button role="tab" id="t-v1k" aria-controls="v1k" aria-selected="false">1k view</button>
+    <button role="tab" id="t-v100" aria-controls="v100" aria-selected="false">100 view</button>
+  </div>
+
+  <!-- ===================================================== 10k -->
+  <section class="panel" role="tabpanel" id="v10k" aria-labelledby="t-v10k">
+    <p class="where"><b>What is it?</b> Start here. What a rebase does, in pictures. No git knowledge needed.</p>
+
+    <!-- 1 -->
+    <div class="pane">
+      <h2>Rebase moves your work to the end of the line.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 440" role="img" aria-label="Before: your two changes branch off an old point on main. After: the same two changes sit at the end of main, in one straight line.">
+          <text class="lb s" x="24" y="40">before</text>
+          <path class="ties" d="M40,110 H690"/>
+          <path class="rl" d="M40,110 H690"/>
+          <path class="ties" d="M230,110 C300,110 300,200 370,200 H650"/>
+          <path class="rl a" d="M230,110 C300,110 300,200 370,200 H650"/>
+          <circle class="bead" cx="100" cy="110" r="22"/>
+          <circle class="bead" cx="230" cy="110" r="22"/>
+          <circle class="bead" cx="400" cy="110" r="22"/>
+          <circle class="bead" cx="540" cy="110" r="22"/>
+          <circle class="bead a" cx="450" cy="200" r="24"/>
+          <circle class="bead a" cx="580" cy="200" r="24"/>
+          <text class="lb" x="40" y="72">main</text>
+          <text class="lb s" x="470" y="70" text-anchor="middle">others kept working</text>
+          <text class="lb a" x="515" y="252" text-anchor="middle">your work</text>
+          <line class="ln t" x1="20" y1="280" x2="700" y2="280" stroke-dasharray="4 8"/>
+          <text class="lb s" x="24" y="318">after</text>
+          <path class="ties" d="M40,370 H690"/>
+          <path class="rl" d="M40,370 H460"/>
+          <path class="rl a" d="M460,370 H690"/>
+          <circle class="bead" cx="100" cy="370" r="22"/>
+          <circle class="bead" cx="230" cy="370" r="22"/>
+          <circle class="bead" cx="360" cy="370" r="22"/>
+          <circle class="bead" cx="460" cy="370" r="22"/>
+          <circle class="bead a" cx="570" cy="370" r="24"/>
+          <circle class="bead a" cx="660" cy="370" r="24"/>
+          <text class="lb a" x="615" y="425" text-anchor="middle">your work, at the end</text>
+        </svg>
+      </div>
+      <p>Same changes. They now start from the newest version of main.</p>
+    </div>
+
+    <!-- 2 -->
+    <div class="pane">
+      <h2>Your changes get copied, not moved.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 400" role="img" aria-label="A conveyor belt carries your old changes into a copy machine. Identical copies with new IDs come out the other side. The old ones are hidden, not deleted.">
+          <rect class="box f" x="30" y="240" width="660" height="34" rx="17"/>
+          <g class="fm"><circle cx="70" cy="257" r="9"/><circle cx="150" cy="257" r="9"/><circle cx="230" cy="257" r="9"/><circle cx="310" cy="257" r="9"/><circle cx="390" cy="257" r="9"/><circle cx="470" cy="257" r="9"/><circle cx="550" cy="257" r="9"/><circle cx="630" cy="257" r="9"/></g>
+          <rect class="box g" x="44" y="130" width="100" height="104" rx="10"/>
+          <text class="lb s" x="94" y="175" text-anchor="middle">change 1</text>
+          <text class="lb s m" x="94" y="205" text-anchor="middle">ID 3c1d</text>
+          <rect class="box g" x="156" y="130" width="100" height="104" rx="10"/>
+          <text class="lb s" x="206" y="175" text-anchor="middle">change 2</text>
+          <text class="lb s m" x="206" y="205" text-anchor="middle">ID 7a9b</text>
+          <rect class="box" x="280" y="70" width="160" height="164" rx="14"/>
+          <rect class="fm" x="300" y="200" width="120" height="34" rx="4"/>
+          <text class="lb" x="360" y="122" text-anchor="middle">copy</text>
+          <text class="lb" x="360" y="152" text-anchor="middle">machine</text>
+          <circle class="fa" cx="410" cy="92" r="8"/>
+          <rect class="box a" x="462" y="130" width="100" height="104" rx="10"/>
+          <text class="lb s" x="512" y="175" text-anchor="middle">change 1</text>
+          <text class="lb a m" style="font-size:19px" x="512" y="205" text-anchor="middle">ID 5b6c</text>
+          <rect class="box a" x="574" y="130" width="100" height="104" rx="10"/>
+          <text class="lb s" x="624" y="175" text-anchor="middle">change 2</text>
+          <text class="lb a m" style="font-size:19px" x="624" y="205" text-anchor="middle">ID d4e3</text>
+          <path class="ln" d="M40,40 H680" marker-end="url(#ah)"/>
+          <text class="lb s" x="360" y="30" text-anchor="middle">one at a time, oldest first</text>
+          <text class="lb s" x="150" y="320" text-anchor="middle">old ones: hidden,</text>
+          <text class="lb s" x="150" y="346" text-anchor="middle">not deleted</text>
+          <text class="lb a" x="568" y="320" text-anchor="middle">same changes,</text>
+          <text class="lb a" x="568" y="348" text-anchor="middle">brand-new IDs</text>
+        </svg>
+      </div>
+      <p>Every change gets a new ID. That one fact explains every rule below.</p>
+    </div>
+
+    <!-- 3 -->
+    <div class="pane">
+      <h2>Why bother? One straight line is easier to read.</h2>
+      <div class="two">
+        <div class="pic">
+          <svg viewBox="0 0 340 300" role="img" aria-label="Merge: two tracks join with a knot, and history keeps every fork.">
+            <text class="lb s" x="20" y="36">merge</text>
+            <path class="ties" d="M20,120 H320"/>
+            <path class="rl" d="M20,120 H320"/>
+            <path class="rl" d="M80,120 C120,120 120,200 160,200 H210 C250,200 250,120 270,120"/>
+            <circle class="bead" cx="80" cy="120" r="16"/>
+            <circle class="bead" cx="180" cy="120" r="16"/>
+            <circle class="bead" cx="150" cy="200" r="16"/>
+            <circle class="bead" cx="215" cy="200" r="16"/>
+            <circle class="bead a" cx="275" cy="120" r="20"/>
+            <text class="lb a" x="275" y="80" text-anchor="middle">knot</text>
+            <text class="lb s" x="170" y="262" text-anchor="middle">every fork stays</text>
+          </svg>
+        </div>
+        <div class="pic">
+          <svg viewBox="0 0 340 300" role="img" aria-label="Rebase: one straight line of changes, easy to follow.">
+            <text class="lb s" x="20" y="36">rebase</text>
+            <path class="ties" d="M20,120 H320"/>
+            <path class="rl" d="M20,120 H200"/>
+            <path class="rl a" d="M200,120 H320"/>
+            <circle class="bead" cx="50" cy="120" r="16"/>
+            <circle class="bead" cx="120" cy="120" r="16"/>
+            <circle class="bead" cx="190" cy="120" r="16"/>
+            <circle class="bead a" cx="250" cy="120" r="18"/>
+            <circle class="bead a" cx="305" cy="120" r="18"/>
+            <text class="lb a" x="278" y="80" text-anchor="middle">yours</text>
+            <text class="lb s" x="170" y="262" text-anchor="middle">one straight line</text>
+          </svg>
+        </div>
+      </div>
+      <p>Merging also works. It keeps the true shape. Rebasing keeps a tidy one.</p>
+    </div>
+
+    <!-- 4 -->
+    <div class="pane">
+      <h2>If two edits clash, git stops and waits for you.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 460" role="img" aria-label="The copy belt stops at change 2 because it edits the same line as someone else. You pick one of three signs: fix it and keep going, skip this one, or undo everything.">
+          <rect class="box f" x="20" y="200" width="420" height="30" rx="15"/>
+          <g class="fm"><circle cx="60" cy="215" r="8"/><circle cx="140" cy="215" r="8"/><circle cx="220" cy="215" r="8"/><circle cx="300" cy="215" r="8"/><circle cx="380" cy="215" r="8"/></g>
+          <rect class="box" x="40" y="100" width="110" height="96" rx="10"/>
+          <text class="lb" x="95" y="145" text-anchor="middle">change 1</text>
+          <text class="lb s" x="95" y="175" text-anchor="middle">copied ✓</text>
+          <rect class="box r" x="200" y="100" width="130" height="96" rx="10"/>
+          <text class="lb" x="265" y="145" text-anchor="middle">change 2</text>
+          <text class="lb r" x="265" y="175" text-anchor="middle">clash</text>
+          <text class="lb s" x="265" y="74" text-anchor="middle">same line edited twice</text>
+          <polygon class="fr" points="519.4,36.1 580.6,36.1 623.9,79.4 623.9,140.6 580.6,183.9 519.4,183.9 476.1,140.6 476.1,79.4"/>
+          <polygon fill="none" stroke="#fff" stroke-width="4" points="522,44 578,44 616,82 616,138 578,176 522,176 484,138 484,82"/>
+          <text class="lb w h" x="550" y="124" text-anchor="middle">STOP</text>
+          <rect class="fm" x="544" y="184" width="12" height="56"/>
+          <rect class="box a" x="20" y="290" width="216" height="110" rx="12"/>
+          <text class="lb a" x="128" y="335" text-anchor="middle">fix it,</text>
+          <text class="lb a" x="128" y="368" text-anchor="middle">keep going</text>
+          <rect class="box" x="252" y="290" width="216" height="110" rx="12"/>
+          <text class="lb" x="360" y="335" text-anchor="middle">skip this</text>
+          <text class="lb" x="360" y="368" text-anchor="middle">one change</text>
+          <rect class="box" x="484" y="290" width="216" height="110" rx="12"/>
+          <text class="lb" x="592" y="335" text-anchor="middle">undo all,</text>
+          <text class="lb" x="592" y="368" text-anchor="middle">back to start</text>
+          <text class="lb s" x="360" y="440" text-anchor="middle">you pick. git won't guess.</text>
+        </svg>
+      </div>
+      <p>It stops on one change at a time. You might stop more than once.</p>
+    </div>
+
+    <!-- 5 -->
+    <div class="pane">
+      <h2>You can't lose your work by accident. There's a safety net.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 420" role="img" aria-label="After a rebase, the old versions of your changes fall off the track into a safety net. Git remembers them for about 30 days by default.">
+          <path class="ties" d="M30,90 H690"/>
+          <path class="rl" d="M30,90 H380"/>
+          <path class="rl a" d="M380,90 H690"/>
+          <circle class="bead" cx="80" cy="90" r="20"/>
+          <circle class="bead" cx="200" cy="90" r="20"/>
+          <circle class="bead" cx="320" cy="90" r="20"/>
+          <circle class="bead a" cx="470" cy="90" r="22"/>
+          <circle class="bead a" cx="580" cy="90" r="22"/>
+          <text class="lb a" x="525" y="46" text-anchor="middle">new copies</text>
+          <circle class="bead g" cx="300" cy="230" r="22"/>
+          <circle class="bead g" cx="410" cy="250" r="22"/>
+          <path class="ln t d" d="M300,180 V200 M410,196 V222"/>
+          <text class="lb s" x="160" y="215" text-anchor="end">old versions</text>
+          <path class="ln t" d="M170,208 L270,226" marker-end="url(#ah)"/>
+          <rect class="fm" x="166" y="240" width="10" height="120"/>
+          <rect class="fm" x="544" y="240" width="10" height="120"/>
+          <g class="ln a t">
+            <path d="M171,250 Q360,350 549,250"/>
+            <path d="M171,275 Q360,365 549,275"/>
+            <path d="M171,300 Q360,378 549,300"/>
+            <path d="M220,272 L232,330 M270,290 L276,349 M320,300 L322,360 M370,302 L368,363 M420,296 L416,357 M470,284 L463,345 M515,266 L505,320"/>
+          </g>
+          <text class="lb a" x="360" y="400" text-anchor="middle">git's memory: kept ~30 days</text>
+        </svg>
+      </div>
+      <p>If a rebase goes wrong, you can get the old version back.</p>
+    </div>
+
+    <!-- 6 -->
+    <div class="pane">
+      <h2>The one big risk: don't rebase a branch someone else uses.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 440" role="img" aria-label="Alice rebases a branch that bob also built on. Alice now has new copies; bob still has the old ones plus his own work. When they combine, the same changes appear twice.">
+          <circle class="fm" cx="54" cy="86" r="16"/>
+          <path class="ln" d="M54,104 V140 M34,118 H74 M54,140 L40,170 M54,140 L68,170"/>
+          <text class="lb" x="54" y="200" text-anchor="middle">alice</text>
+          <path class="ties" d="M110,130 H690"/>
+          <path class="rl" d="M110,130 H690"/>
+          <circle class="bead" cx="150" cy="130" r="20"/>
+          <circle class="bead" cx="260" cy="130" r="20"/>
+          <circle class="bead" cx="400" cy="130" r="22"/>
+          <circle class="bead" cx="520" cy="130" r="22"/>
+          <text class="lb s" x="460" y="88" text-anchor="middle">her new copies</text>
+          <circle class="fm" cx="54" cy="276" r="16"/>
+          <path class="ln" d="M54,294 V330 M34,308 H74 M54,330 L40,360 M54,330 L68,360"/>
+          <text class="lb" x="54" y="390" text-anchor="middle">bob</text>
+          <path class="ties" d="M110,320 H690"/>
+          <path class="rl" d="M110,320 H600"/>
+          <circle class="bead" cx="150" cy="320" r="20"/>
+          <circle class="bead g" cx="290" cy="320" r="22"/>
+          <circle class="bead g" cx="400" cy="320" r="22"/>
+          <circle class="bead a" cx="540" cy="320" r="24"/>
+          <text class="lb s" x="345" y="378" text-anchor="middle">the old copies</text>
+          <text class="lb a" x="540" y="378" text-anchor="middle">bob's work</text>
+          <path class="ln a" d="M640,140 C700,190 700,270 640,310" marker-end="url(#aha)" marker-start="url(#aha)"/>
+          <text class="lb a" x="610" y="215" text-anchor="end">same changes,</text>
+          <text class="lb a" x="610" y="245" text-anchor="end">twice</text>
+        </svg>
+      </div>
+      <p>Rebase only branches that only you work on.</p>
+    </div>
+
+    <!-- 7 -->
+    <div class="pane">
+      <h2>Already shared it? Overwrite it, with a safety catch.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 420" role="img" aria-label="Your laptop has new copies; the shared server has the old ones. A normal push is refused. A careful forced push goes through only if nobody else changed the server copy.">
+          <rect class="box" x="40" y="130" width="170" height="110" rx="8"/>
+          <path class="fm" d="M20,248 H230 L214,268 H36 Z"/>
+          <circle class="bead a" cx="95" cy="185" r="16"/>
+          <circle class="bead a" cx="155" cy="185" r="16"/>
+          <text class="lb" x="125" y="310" text-anchor="middle">your laptop</text>
+          <text class="lb s" x="125" y="338" text-anchor="middle">new copies</text>
+          <rect class="box" x="520" y="110" width="170" height="44" rx="8"/>
+          <rect class="box" x="520" y="164" width="170" height="44" rx="8"/>
+          <rect class="box" x="520" y="218" width="170" height="44" rx="8"/>
+          <circle class="ff" cx="545" cy="132" r="6"/><circle class="ff" cx="545" cy="186" r="6"/><circle class="ff" cx="545" cy="240" r="6"/>
+          <text class="lb" x="605" y="310" text-anchor="middle">shared server</text>
+          <text class="lb s" x="605" y="338" text-anchor="middle">old copies</text>
+          <path class="ln" d="M240,150 H350"/>
+          <path class="ln r" d="M362,128 L402,172 M402,128 L362,172"/>
+          <text class="lb r" x="382" y="104" text-anchor="middle">normal push: refused</text>
+          <path class="ln a" d="M240,232 H500" marker-end="url(#aha)"/>
+          <rect class="box a" x="352" y="206" width="40" height="34" rx="6"/>
+          <path class="ln a t" d="M360,206 V194 a12,12 0 0 1 24,0 V206"/>
+          <text class="lb a" x="372" y="388" text-anchor="middle">careful push: only if nobody</text>
+          <text class="lb a" x="372" y="414" text-anchor="middle">else changed the server copy</text>
+          <path class="ln a t" d="M372,280 V362"/>
+        </svg>
+      </div>
+      <p>The server still has the old IDs, so a plain push is refused. That's expected.</p>
+    </div>
+
+    <!-- 8 -->
+    <div class="pane">
+      <h2>First time? Five steps, and an undo button.</h2>
+      <div class="pic">
+        <svg viewBox="0 0 720 400" role="img" aria-label="Five steps in a row: save your work, get the latest main, rebase, check it still works, push carefully. Below them, a big undo button that takes you back to the start.">
+          <path class="ln" d="M70,90 H650"/>
+          <g>
+            <circle class="bead" cx="70" cy="90" r="34"/><text class="lb" x="70" y="99" text-anchor="middle">1</text>
+            <circle class="bead" cx="215" cy="90" r="34"/><text class="lb" x="215" y="99" text-anchor="middle">2</text>
+            <circle class="bead a" cx="360" cy="90" r="38"/><text class="lb w" x="360" y="99" text-anchor="middle">3</text>
+            <circle class="bead" cx="505" cy="90" r="34"/><text class="lb" x="505" y="99" text-anchor="middle">4</text>
+            <circle class="bead" cx="650" cy="90" r="34"/><text class="lb" x="650" y="99" text-anchor="middle">5</text>
+          </g>
+          <text class="lb s" x="70" y="160" text-anchor="middle">save</text><text class="lb s" x="70" y="184" text-anchor="middle">your work</text>
+          <text class="lb s" x="215" y="160" text-anchor="middle">get latest</text><text class="lb s" x="215" y="184" text-anchor="middle">main</text>
+          <text class="lb a" x="360" y="160" text-anchor="middle">rebase</text>
+          <text class="lb s" x="505" y="160" text-anchor="middle">check it</text><text class="lb s" x="505" y="184" text-anchor="middle">still works</text>
+          <text class="lb s" x="650" y="160" text-anchor="middle">push</text><text class="lb s" x="650" y="184" text-anchor="middle">carefully</text>
+          <rect class="box a" x="210" y="250" width="300" height="100" rx="50"/>
+          <path class="ln a" d="M262,312 a24,24 0 1 0 6,-30" marker-end="url(#aha)"/>
+          <text class="lb a" x="400" y="296" text-anchor="middle">undo</text>
+          <text class="lb s" x="400" y="326" text-anchor="middle">back to start</text>
+        </svg>
+      </div>
+      <p>Mid-way and unsure? Undo. You're exactly where you began.</p>
+    </div>
+  </section>
+
+  <!-- ===================================================== 5k -->
+  <section class="panel" role="tabpanel" id="v5k" aria-labelledby="t-v5k" hidden>
+    <p class="where"><b>How does it work?</b> Read this if the 10k view made sense and you want the moving parts.</p>
+    <p class="lead">The 10k view showed your changes getting copied to the end of main. Here's what does the copying: git finds where you split off, lists your commits, replays each one onto main's tip, then moves your branch name to the last copy.</p>
+
+    <figure class="fig">
+      <svg viewBox="0 0 760 470" role="img" aria-label="Parts diagram of a rebase in progress: the merge base, main's tip, the commits to replay, the new copies, the detached HEAD, ORIG_HEAD and the reflog, and the server copy.">
+        <path class="rl" d="M40,300 H330"/>
+        <path class="rl g" d="M150,300 C200,300 200,170 250,170 H470"/>
+        <path class="rl a" d="M330,300 H700"/>
+        <circle class="bead" cx="70" cy="300" r="18"/>
+        <circle class="bead" cx="150" cy="300" r="20"/>
+        <circle class="bead" cx="330" cy="300" r="20"/>
+        <circle class="bead g" cx="300" cy="170" r="20"/>
+        <circle class="bead g" cx="440" cy="170" r="20"/>
+        <circle class="bead a" cx="470" cy="300" r="20"/>
+        <circle class="bead a" cx="610" cy="300" r="20"/>
+        <text class="lb s m" x="300" y="215" text-anchor="middle" style="font-size:15px">A 3c1d</text>
+        <text class="lb s m" x="440" y="215" text-anchor="middle" style="font-size:15px">B 7a9b</text>
+        <text class="lb a m" x="470" y="345" text-anchor="middle" style="font-size:15px">A' 5b6c</text>
+        <text class="lb a m" x="610" y="345" text-anchor="middle" style="font-size:15px">B' d4e3</text>
+        <path class="ln t" d="M150,360 V325"/>
+        <text class="lb" x="150" y="386" text-anchor="middle" style="font-size:18px">merge base</text>
+        <text class="lb s" x="150" y="408" text-anchor="middle" style="font-size:15px">where you split off</text>
+        <path class="ln t" d="M330,360 V325"/>
+        <text class="lb" x="330" y="386" text-anchor="middle" style="font-size:18px">main's tip</text>
+        <text class="lb s" x="330" y="408" text-anchor="middle" style="font-size:15px">the new base</text>
+        <rect class="box g" x="262" y="130" width="214" height="98" rx="12"/>
+        <text class="lb" x="370" y="112" text-anchor="middle" style="font-size:18px">replay list: main..feature/login</text>
+        <text class="lb s" x="370" y="92" text-anchor="middle" style="font-size:15px">oldest first</text>
+        <path class="ln a t d" d="M310,192 C340,250 420,250 460,280" marker-end="url(#aha)"/>
+        <path class="ln a t d" d="M450,192 C500,250 570,250 600,280" marker-end="url(#aha)"/>
+        <text class="lb a" x="560" y="400" text-anchor="middle" style="font-size:18px">new copies (HEAD detached here</text>
+        <text class="lb a" x="560" y="422" text-anchor="middle" style="font-size:18px">while the replay runs)</text>
+        <rect class="box" x="520" y="30" width="220" height="64" rx="8"/>
+        <text class="lb" x="630" y="58" text-anchor="middle" style="font-size:17px">ORIG_HEAD + reflog</text>
+        <text class="lb s" x="630" y="82" text-anchor="middle" style="font-size:15px">remember old tip B</text>
+        <path class="ln t" d="M560,94 L460,152" marker-end="url(#ah)"/>
+        <rect class="box" x="20" y="30" width="220" height="64" rx="8"/>
+        <text class="lb" x="130" y="58" text-anchor="middle" style="font-size:17px">origin/feature/login</text>
+        <text class="lb s" x="130" y="82" text-anchor="middle" style="font-size:15px">server copy, untouched</text>
+        <path class="ln t" d="M200,94 C300,120 380,120 425,155" marker-end="url(#ah)"/>
+        <rect class="box a" x="640" y="240" width="110" height="36" rx="6"/>
+        <text class="lb a" x="695" y="265" text-anchor="middle" style="font-size:15px">feature/login</text>
+        <path class="ln a t" d="M660,276 L625,290" marker-end="url(#aha)"/>
+        <text class="lb s" x="695" y="232" text-anchor="middle" style="font-size:14px">moves at the end</text>
+      </svg>
+      <figcaption>Dashed beads are the old commits. Solid accent beads are the copies. Labels are pointers, not containers: moving a label doesn't move or delete commits.</figcaption>
+    </figure>
+
+    <h3>The parts</h3>
+    <div class="parts">
+      <div class="card"><h4>Branch name</h4><p><code>feature/login</code> is a label pointing at one commit. Rebase builds new commits, then moves this label to the last one. Nothing else moves. <code>main</code> stays exactly where it was.</p></div>
+      <div class="card"><h4>Merge base</h4><p>The last commit your branch and <code>main</code> share. Everything after it on your side is "your work". Everything after it on main's side is what you're catching up to.</p></div>
+      <div class="card"><h4>Replay list</h4><p>The commits on your branch that aren't on main: <code>main..feature/login</code>, oldest first. Merge commits are dropped and their changes flattened, unless you pass <code>--rebase-merges</code>. Commits already on main (same change) get skipped.</p></div>
+      <div class="card"><h4>The replay</h4><p>Git checks out main's tip with a <b>detached HEAD</b> and applies each commit's change, one at a time, like a cherry-pick. Each result is a new commit with a new hash. Your author name, date, and message carry over. The committer date becomes now.</p></div>
+      <div class="card"><h4>The stop</h4><p>If a change doesn't apply cleanly, git pauses on that one commit, marks the clashing files, and hands control to you. You fix, <code>git add</code>, then <code>--continue</code>. Or <code>--skip</code> that commit. Or <code>--abort</code> the whole thing.</p></div>
+      <div class="card"><h4>The finish</h4><p>Git moves <code>feature/login</code> to the last copy and checks it out. It writes <code>ORIG_HEAD</code> and a <b>reflog</b> entry, both pointing at your old tip. That's the safety net from the 10k view.</p></div>
+      <div class="card"><h4>The server copy</h4><p><code>origin/feature/login</code> still points at the old commits. Your new commits don't descend from them, so a normal push is refused as "non-fast-forward". You need a force-push.</p></div>
+      <div class="card"><h4>Interactive mode</h4><p><code>git rebase -i</code> shows you the replay list in an editor first. You can reorder, squash, reword, or drop commits before replay starts.</p></div>
+    </div>
+
+    <h3>The flow, step by step</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 640 780" role="img" aria-label="Flow: find the merge base, list commits, detach HEAD at main's tip, apply the next commit. If there's a conflict, stop and wait for you to continue, skip, or abort. If more commits remain, loop. Otherwise move the branch name and record the old tip.">
+        <rect class="box" x="150" y="20" width="340" height="60" rx="10"/>
+        <text class="lb" x="320" y="58" text-anchor="middle" style="font-size:20px">1. Find the merge base</text>
+        <path class="ln t" d="M320,80 V110" marker-end="url(#ah)"/>
+        <rect class="box" x="150" y="114" width="340" height="60" rx="10"/>
+        <text class="lb" x="320" y="152" text-anchor="middle" style="font-size:20px">2. List commits to replay</text>
+        <path class="ln t" d="M320,174 V204" marker-end="url(#ah)"/>
+        <rect class="box" x="150" y="208" width="340" height="60" rx="10"/>
+        <text class="lb" x="320" y="246" text-anchor="middle" style="font-size:20px">3. Detach HEAD at main's tip</text>
+        <path class="ln t" d="M320,268 V298" marker-end="url(#ah)"/>
+        <rect class="box a" x="150" y="302" width="340" height="60" rx="10"/>
+        <text class="lb a" x="320" y="340" text-anchor="middle" style="font-size:20px">4. Apply the next commit</text>
+        <path class="ln t" d="M320,362 V392" marker-end="url(#ah)"/>
+        <polygon class="box" points="320,396 420,446 320,496 220,446"/>
+        <text class="lb" x="320" y="453" text-anchor="middle" style="font-size:19px">Conflict?</text>
+        <path class="ln r t" d="M420,446 H470" marker-end="url(#ahr)"/>
+        <text class="lb r" x="445" y="436" text-anchor="middle" style="font-size:16px">yes</text>
+        <rect class="box r" x="474" y="380" width="156" height="132" rx="10"/>
+        <text class="lb" x="552" y="410" text-anchor="middle" style="font-size:17px">STOP. You:</text>
+        <text class="lb s m" x="552" y="438" text-anchor="middle" style="font-size:14px">fix + git add</text>
+        <text class="lb s m" x="552" y="458" text-anchor="middle" style="font-size:14px">--continue</text>
+        <text class="lb s m" x="552" y="478" text-anchor="middle" style="font-size:14px">--skip</text>
+        <text class="lb s m" x="552" y="498" text-anchor="middle" style="font-size:14px">--abort → undo all</text>
+        <path class="ln t" d="M552,380 V332 H494" marker-end="url(#ah)"/>
+        <text class="lb s" x="560" y="322" style="font-size:14px">continue/skip</text>
+        <path class="ln t" d="M320,496 V526" marker-end="url(#ah)"/>
+        <text class="lb s" x="334" y="518" style="font-size:16px">no</text>
+        <polygon class="box" points="320,530 430,580 320,630 210,580"/>
+        <text class="lb" x="320" y="587" text-anchor="middle" style="font-size:19px">More left?</text>
+        <path class="ln t" d="M210,580 H90 V332 H146" marker-end="url(#ah)"/>
+        <text class="lb s" x="100" y="570" style="font-size:16px">yes</text>
+        <path class="ln t" d="M320,630 V660" marker-end="url(#ah)"/>
+        <text class="lb s" x="334" y="652" style="font-size:16px">no</text>
+        <rect class="box a" x="100" y="664" width="440" height="96" rx="10"/>
+        <text class="lb a" x="320" y="700" text-anchor="middle" style="font-size:20px">5. Move feature/login to last copy</text>
+        <text class="lb s" x="320" y="730" text-anchor="middle" style="font-size:17px">write ORIG_HEAD + reflog → old tip</text>
+      </svg>
+      <figcaption>The loop runs once per commit. A conflict pauses inside the loop, so a branch with several clashing commits stops several times.</figcaption>
+    </figure>
+
+    <h3>Side effects, by name</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>What changes</th><th>What doesn't</th></tr></thead>
+      <tbody>
+        <tr><td>Every replayed commit gets a <b>new hash</b> and a new committer date.</td><td>Your file changes, commit messages, author, and author date.</td></tr>
+        <tr><td><code>feature/login</code> points at the new last commit.</td><td><code>main</code> and every other branch.</td></tr>
+        <tr><td><code>ORIG_HEAD</code> and the reflog record your old tip.</td><td>The old commits. They still exist, unlabeled, until garbage collection (reflog keeps them about 30 days by default).</td></tr>
+        <tr><td>Your branch and <code>origin/feature/login</code> have <b>diverged</b>.</td><td>The server. Nothing leaves your machine until you push.</td></tr>
+        <tr><td>Merge commits on your branch are flattened away (by default).</td><td>Uncommitted work: git refuses to start if you have unstaged changes, unless you pass <code>--autostash</code>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Interactive rebase: edit the list before replay</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 760 300" role="img" aria-label="The interactive rebase todo list: one line per commit, oldest at the top. Change the first word to pick, reword, squash, fixup, edit, or drop.">
+        <rect class="box f" x="20" y="20" width="460" height="260" rx="10"/>
+        <text class="lb s m" x="44" y="60" style="font-size:15px"># git rebase -i main opens this</text>
+        <text class="lb m" x="44" y="104" style="font-size:19px">pick  3c1d2e4 Add login form</text>
+        <text class="lb a m" x="44" y="144" style="font-size:19px">fixup 7a9b0c5 Validate password</text>
+        <text class="lb m" x="44" y="184" style="font-size:19px">pick  0e1f2a3 Style login page</text>
+        <text class="lb s m" x="44" y="230" style="font-size:15px"># top runs first. save + close</text>
+        <text class="lb s m" x="44" y="254" style="font-size:15px"># the editor to start replay</text>
+        <path class="ln a t" d="M484,138 H520" marker-end="url(#aha)"/>
+        <text class="lb" x="530" y="60" style="font-size:18px">pick: keep</text>
+        <text class="lb" x="530" y="92" style="font-size:18px">reword: new message</text>
+        <text class="lb a" x="530" y="124" style="font-size:18px">fixup: fold into the</text>
+        <text class="lb a" x="530" y="146" style="font-size:18px">one above, drop msg</text>
+        <text class="lb" x="530" y="178" style="font-size:18px">squash: fold in,</text>
+        <text class="lb" x="530" y="200" style="font-size:18px">combine messages</text>
+        <text class="lb" x="530" y="232" style="font-size:18px">edit: pause to amend</text>
+        <text class="lb" x="530" y="264" style="font-size:18px">drop: remove it</text>
+      </svg>
+      <figcaption>Example list. Reordering lines reorders commits. Deleting a line drops that commit.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===================================================== 1k -->
+  <section class="panel" role="tabpanel" id="v1k" aria-labelledby="t-v1k" hidden>
+    <p class="where"><b>What should we decide?</b> Read this if you're about to run it and need to make a call. The risks, the trade-offs, and what I'd do.</p>
+    <div class="card rec">
+      <p class="lead"><b>My call:</b> if <code>feature/login</code> is yours alone, fetch, rebase onto <code>origin/main</code>, run your tests, and push with <code>--force-with-lease</code>. If anyone else has pulled or built on the branch, merge main in instead.</p>
+    </div>
+
+    <h3>Decision 1: rebase or merge?</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 720 420" role="img" aria-label="Decision flow: has anyone else pulled or built on this branch? Yes: merge main in. No: has it been pushed? No: rebase and push normally. Yes: rebase and push with force-with-lease.">
+        <rect class="box" x="170" y="20" width="380" height="80" rx="12"/>
+        <text class="lb" x="360" y="54" text-anchor="middle" style="font-size:21px">Has anyone else pulled</text>
+        <text class="lb" x="360" y="82" text-anchor="middle" style="font-size:21px">or built on this branch?</text>
+        <path class="ln r" d="M220,100 L130,170" marker-end="url(#ahr)"/>
+        <text class="lb r" x="150" y="130" text-anchor="end" style="font-size:19px">yes</text>
+        <rect class="box r" x="20" y="174" width="230" height="96" rx="12"/>
+        <text class="lb" x="135" y="214" text-anchor="middle" style="font-size:21px">Merge main in</text>
+        <text class="lb s" x="135" y="244" text-anchor="middle" style="font-size:16px">or agree a time with them</text>
+        <path class="ln" d="M500,100 L560,170" marker-end="url(#ah)"/>
+        <text class="lb s" x="550" y="130" style="font-size:19px">no</text>
+        <rect class="box" x="400" y="174" width="300" height="70" rx="12"/>
+        <text class="lb" x="550" y="216" text-anchor="middle" style="font-size:21px">Have you pushed it yet?</text>
+        <path class="ln" d="M470,244 L400,310" marker-end="url(#ah)"/>
+        <text class="lb s" x="420" y="276" text-anchor="end" style="font-size:19px">no</text>
+        <path class="ln a" d="M630,244 L650,310" marker-end="url(#aha)"/>
+        <text class="lb a" x="660" y="276" style="font-size:19px">yes</text>
+        <rect class="box" x="250" y="314" width="220" height="90" rx="12"/>
+        <text class="lb" x="360" y="352" text-anchor="middle" style="font-size:20px">Rebase,</text>
+        <text class="lb" x="360" y="380" text-anchor="middle" style="font-size:20px">normal push</text>
+        <rect class="box a" x="490" y="314" width="220" height="90" rx="12"/>
+        <text class="lb a" x="600" y="352" text-anchor="middle" style="font-size:20px">Rebase, push</text>
+        <text class="lb a m" x="600" y="380" text-anchor="middle" style="font-size:15px">--force-with-lease</text>
+      </svg>
+    </figure>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>Rebase</th><th>Merge main in</th></tr></thead>
+      <tbody>
+        <tr><td>History shape</td><td class="pick">One straight line. Easy to read, bisect, and review commit by commit.</td><td>True shape, with a merge commit each time you sync.</td></tr>
+        <tr><td>Commit hashes</td><td>All of yours change.</td><td class="pick">None change.</td></tr>
+        <tr><td>Push after</td><td>Needs a force-push if already pushed.</td><td class="pick">Normal push.</td></tr>
+        <tr><td>Conflicts</td><td>Resolved per commit. Can stop several times.</td><td class="pick">Resolved once, in the merge commit.</td></tr>
+        <tr><td>Safe on shared branches</td><td>No. Others end up with duplicate commits.</td><td class="pick">Yes.</td></tr>
+        <tr><td>Undo</td><td><code>--abort</code> mid-way, reflog after.</td><td><code>git merge --abort</code> mid-way, <code>git reset</code> after.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Decision 2: how to push after rebasing</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Option</th><th>What it does</th><th>Use it?</th></tr></thead>
+      <tbody>
+        <tr><td><code>git push</code></td><td>Refused: your branch no longer descends from the server's copy.</td><td>Won't work. That's expected.</td></tr>
+        <tr><td><code>git push --force</code></td><td>Overwrites the server branch no matter what's there. Silently deletes any commit someone else pushed since you last fetched.</td><td>Avoid.</td></tr>
+        <tr><td class="pick"><code>git push --force-with-lease</code></td><td>Overwrites only if the server branch still matches your last-fetched <code>origin/feature/login</code>. Otherwise refused as "stale info".</td><td class="pick">Yes. Default choice.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="card warn"><p><b>Lease gotcha:</b> the lease checks against your last fetch. If you run <code>git fetch</code> right before pushing, you "accept" whatever is on the server, and the lease passes even if you never looked at it. If you fetch, check <code>git log feature/login..origin/feature/login</code> first. Git 2.30 and later also offer <code>--force-if-includes</code> to close this gap.</p></div>
+
+    <h3>Decision 3: when it stops on a conflict</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Command</th><th>Pick it when</th><th>Watch out</th></tr></thead>
+      <tbody>
+        <tr><td class="pick"><code>--continue</code></td><td>You fixed the files and ran <code>git add</code> on them.</td><td>Git opens your editor for the message. Save and close it.</td></tr>
+        <tr><td><code>--skip</code></td><td>This commit isn't needed any more, such as when main already has the same fix.</td><td><b>Drops that commit's changes.</b> Not a "fix later" button.</td></tr>
+        <tr><td><code>--abort</code></td><td>You're unsure, tired, or the conflict is bigger than expected.</td><td>Nothing. You're back to the exact pre-rebase state.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Decision 4: squash first?</h3>
+    <figure class="fig">
+      <svg viewBox="0 0 720 260" role="img" aria-label="Example: six commits that all edit the same function can stop the rebase up to six times. Squashed into one commit first, it can stop at most once.">
+        <text class="lb s" x="20" y="34" style="font-size:16px">example, not measured</text>
+        <text class="lb" x="20" y="96" style="font-size:20px">6 commits</text>
+        <g><rect class="box r" x="180" y="66" width="70" height="44" rx="6"/><rect class="box r" x="260" y="66" width="70" height="44" rx="6"/><rect class="box r" x="340" y="66" width="70" height="44" rx="6"/><rect class="box r" x="420" y="66" width="70" height="44" rx="6"/><rect class="box r" x="500" y="66" width="70" height="44" rx="6"/><rect class="box r" x="580" y="66" width="70" height="44" rx="6"/></g>
+        <text class="lb r" x="415" y="140" text-anchor="middle" style="font-size:18px">up to 6 stops</text>
+        <text class="lb" x="20" y="206" style="font-size:20px">squashed</text>
+        <rect class="box a" x="180" y="176" width="470" height="44" rx="6"/>
+        <text class="lb a" x="415" y="205" text-anchor="middle" style="font-size:18px">at most 1 stop</text>
+      </svg>
+      <figcaption>Squash with <code>git rebase -i $(git merge-base HEAD main)</code> first (no new base, so no conflicts), then rebase onto main. You lose the step-by-step commits, so keep them if reviewers read commit by commit.</figcaption>
+    </figure>
+
+    <h3>What could go wrong</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Edge case</th><th>What happens</th><th>Do this</th></tr></thead>
+      <tbody>
+        <tr><td>Uncommitted changes</td><td>Rebase refuses to start.</td><td>Commit, <code>git stash</code>, or pass <code>--autostash</code>.</td></tr>
+        <tr><td>Stale local main</td><td>You rebase onto an old main and still conflict at review.</td><td><code>git fetch</code>, then rebase onto <code>origin/main</code>.</td></tr>
+        <tr><td>Someone else built on the branch</td><td>They get both old and new copies of every commit after their next pull.</td><td>Don't rebase. Merge. Or coordinate a reset with them.</td></tr>
+        <tr><td>Merge commits on your branch</td><td>Flattened away by default.</td><td>Pass <code>--rebase-merges</code> to keep them.</td></tr>
+        <tr><td>Same conflict over and over</td><td>Each commit that touches the clash stops again.</td><td>Squash first, or turn on <code>git config rerere.enabled true</code> to replay your resolutions.</td></tr>
+        <tr><td>Result looks wrong after finishing</td><td>Old commits are unlabeled but kept.</td><td><code>git reset --hard ORIG_HEAD</code> right away, or find the old tip in <code>git reflog</code>.</td></tr>
+        <tr><td>You panic mid-conflict</td><td>Nothing is lost.</td><td><code>git rebase --abort</code>.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>The plan</h3>
+    <ol>
+      <li>Commit or stash everything. Check <code>git status</code> is clean.</li>
+      <li><code>git fetch origin</code>.</li>
+      <li>Optional: note your tip with <code>git rev-parse --short HEAD</code>. The reflog has it too.</li>
+      <li><code>git rebase origin/main</code>. On each stop: fix, <code>git add</code>, <code>git rebase --continue</code>. If it goes sideways, <code>git rebase --abort</code>.</li>
+      <li>Build and run tests. A clean rebase can still produce code that doesn't work together.</li>
+      <li><code>git push --force-with-lease</code>.</li>
+    </ol>
+  </section>
+
+  <!-- ===================================================== 100 -->
+  <section class="panel" role="tabpanel" id="v100" aria-labelledby="t-v100" hidden>
+    <p class="where"><b>Prove it.</b> Read this to check any claim above. Each proof is a paste-ready repro with the output to expect.</p>
+    <p class="lead">Paste the setup function once into a terminal. Every proof starts by calling <code>demo</code>, which builds a fresh throwaway repo in a temp directory. Needs git 2.28 or later. <b>Your hashes will differ</b> from the ones shown. Output is trimmed to the lines that matter.</p>
+
+    <h3>Claims and where they're proven</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Claim (tab)</th><th>Proof</th></tr></thead>
+      <tbody>
+        <tr><td>Rebase moves your work to the end of main; main doesn't move (10k, 5k)</td><td><span class="tag">P1</span></td></tr>
+        <tr><td>Commits are copied with new hashes; the changes are identical (10k, 5k)</td><td><span class="tag">P2</span></td></tr>
+        <tr><td>Old commits aren't deleted; reflog and <code>ORIG_HEAD</code> recover them (10k, 5k, 1k)</td><td><span class="tag">P3</span></td></tr>
+        <tr><td>Conflicts stop one commit at a time; continue, skip, abort (10k, 5k, 1k)</td><td><span class="tag">P4</span></td></tr>
+        <tr><td>Merge keeps hashes and adds a merge commit (10k, 1k)</td><td><span class="tag">P5</span></td></tr>
+        <tr><td><code>-i</code> squashes, rewords, drops (5k, 1k)</td><td><span class="tag">P6</span></td></tr>
+        <tr><td>A pushed branch needs a force-push after rebase (10k, 5k, 1k)</td><td><span class="tag">P7</span></td></tr>
+        <tr><td><code>--force-with-lease</code> refuses when someone else pushed; <code>--force</code> erases them (10k, 1k)</td><td><span class="tag">P8</span></td></tr>
+        <tr><td>Rebasing a shared branch gives others duplicate commits (10k, 1k)</td><td><span class="tag">P9</span></td></tr>
+        <tr><td>Rebase refuses to start with unstaged changes; <code>--autostash</code> works around it (5k, 1k)</td><td><span class="tag">P10</span></td></tr>
+        <tr><td>Reflog keeps unreachable entries about 30 days by default (10k, 5k)</td><td><span class="tag">P11</span></td></tr>
+      </tbody>
+    </table></div>
+
+    <div class="proof">
+      <h3>Setup: the <code>demo</code> function</h3>
+      <p class="claim">Builds this history: main has <i>Initial app</i> then <i>Add footer</i>. <code>feature/login</code> split off after <i>Initial app</i> and has two commits.</p>
+<pre><code>demo() {
+  cd "$(mktemp -d)" || return
+  git init -q -b main
+  git config user.name alice
+  git config user.email alice@example.com
+  echo v1 &gt; app.txt; git add app.txt; git commit -qm "Initial app"
+  git switch -qc feature/login
+  echo "login form" &gt; login.txt; git add login.txt; git commit -qm "Add login form"
+  echo "check password" &gt;&gt; login.txt; git commit -qam "Validate password"
+  git switch -q main
+  echo footer &gt; footer.txt; git add footer.txt; git commit -qm "Add footer"
+  git switch -q feature/login
+}</code></pre>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P1</span>Your work moves to the end; main stays put</h3>
+<pre><code>demo
+git log --oneline --graph --all
+git rev-parse --short main
+git rebase main
+git log --oneline --graph --all
+git rev-parse --short main</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>* 9e8f7d6 (main) Add footer
+| * 7a9b0c5 (HEAD -&gt; feature/login) Validate password
+| * 3c1d2e4 Add login form
+|/
+* a1b2c3d Initial app
+9e8f7d6
+Successfully rebased and updated refs/heads/feature/login.
+* d4e3f2a (HEAD -&gt; feature/login) Validate password
+* 5b6c7d8 Add login form
+* 9e8f7d6 (main) Add footer
+* a1b2c3d Initial app
+9e8f7d6</code></pre>
+      <p class="look">Look at: the fork is gone, your two commits sit after <i>Add footer</i>, and <code>main</code> prints the same hash before and after.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P2</span>Copies with new hashes, identical changes</h3>
+<pre><code>demo
+git rebase -q main
+git log --oneline -2 ORIG_HEAD    # old tip
+git log --oneline -2 HEAD         # new tip
+git diff --stat ORIG_HEAD HEAD
+git log -1 --format=fuller | grep Date</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>7a9b0c5 Validate password
+3c1d2e4 Add login form
+d4e3f2a Validate password
+5b6c7d8 Add login form
+ footer.txt | 1 +
+ 1 file changed, 1 insertion(+)
+AuthorDate: Tue Oct 20 10:02:11 2026 -0600
+CommitDate: Tue Oct 20 10:02:14 2026 -0600</code></pre>
+      <p class="look">Look at: same messages, different hashes. The only difference between old and new tips is <code>footer.txt</code>, which came from main. Your <code>login.txt</code> changes are byte-for-byte the same. The author date is kept; the commit date is the moment of the rebase (seconds apart here).</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P3</span>The safety net: reflog and <code>ORIG_HEAD</code></h3>
+      <figure class="fig">
+        <svg viewBox="0 0 760 230" role="img" aria-label="Reflog timeline for feature/login: entry 2 created Add login form, entry 1 Validate password at 7a9b0c5, entry 0 the rebase finish at d4e3f2a. Resetting to entry 1 brings back the old tip.">
+          <path class="ln" d="M40,110 H720" marker-end="url(#ah)"/>
+          <circle class="bead" cx="120" cy="110" r="16"/>
+          <circle class="bead a" cx="360" cy="110" r="18"/>
+          <circle class="bead" cx="600" cy="110" r="16"/>
+          <text class="lb m" x="120" y="66" text-anchor="middle" style="font-size:16px">@{2} 3c1d2e4</text>
+          <text class="lb s" x="120" y="160" text-anchor="middle" style="font-size:15px">commit: Add login form</text>
+          <text class="lb a m" x="360" y="66" text-anchor="middle" style="font-size:16px">@{1} 7a9b0c5</text>
+          <text class="lb s" x="360" y="160" text-anchor="middle" style="font-size:15px">commit: Validate password</text>
+          <text class="lb a" x="360" y="186" text-anchor="middle" style="font-size:15px">= ORIG_HEAD, your old tip</text>
+          <text class="lb m" x="600" y="66" text-anchor="middle" style="font-size:16px">@{0} d4e3f2a</text>
+          <text class="lb s" x="600" y="160" text-anchor="middle" style="font-size:15px">rebase (finish)</text>
+          <path class="ln a t d" d="M590,84 C540,20 420,20 372,84" marker-end="url(#aha)"/>
+          <text class="lb a" x="480" y="26" text-anchor="middle" style="font-size:15px">git reset --hard feature/login@{1}</text>
+          <text class="lb s" x="720" y="140" text-anchor="end" style="font-size:14px">time</text>
+        </svg>
+      </figure>
+<pre><code>demo
+git rebase -q main
+git reflog show -3 feature/login
+git rev-parse --short ORIG_HEAD
+git reset --hard feature/login@{1}
+git log --oneline --graph --all</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>d4e3f2a feature/login@{0}: rebase (finish): refs/heads/feature/login onto 9e8f7d6…
+7a9b0c5 feature/login@{1}: commit: Validate password
+3c1d2e4 feature/login@{2}: commit: Add login form
+7a9b0c5
+HEAD is now at 7a9b0c5 Validate password
+* 9e8f7d6 (main) Add footer
+| * 7a9b0c5 (HEAD -&gt; feature/login) Validate password
+| * 3c1d2e4 Add login form
+|/
+* a1b2c3d Initial app</code></pre>
+      <p class="look">Look at: the pre-rebase tip is still in the reflog, and resetting to it restores the original fork exactly. <code>git reset --hard ORIG_HEAD</code> does the same thing, as long as you run it before another command overwrites <code>ORIG_HEAD</code>.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P4</span>Conflicts stop one commit at a time</h3>
+      <p class="claim">Main and the branch both edit line 1 of <code>app.txt</code>, in the branch's third commit.</p>
+<pre><code>demo
+git switch -q main
+echo "v2 from main" &gt; app.txt; git commit -qam "Bump app on main"
+git switch -q feature/login
+echo "v2 from login" &gt; app.txt; git commit -qam "Bump app for login"
+git rebase main</code></pre>
+      <p class="lbl">Expected output</p>
+<pre class="out"><code>Auto-merging app.txt
+CONFLICT (content): Merge conflict in app.txt
+error: could not apply 1f2e3d4... Bump app for login
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm &lt;conflicted_files&gt;", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+Could not apply 1f2e3d4... Bump app for login</code></pre>
+      <p class="look">Look at: the first two commits replayed silently. It stopped on the third, the only one that clashes. The hint lists exactly the three ways out.</p>
+<pre><code>cat app.txt
+git status | grep -E "rebasing|both modified"</code></pre>
+<pre class="out"><code>&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD
+v2 from main
+=======
+v2 from login
+&gt;&gt;&gt;&gt;&gt;&gt;&gt; 1f2e3d4 (Bump app for login)
+You are currently rebasing branch 'feature/login' on '6a7b8c9'.
+	both modified:   app.txt</code></pre>
+      <h4>4a. Abort puts everything back</h4>
+<pre><code>git rebase --abort
+git log --oneline -1</code></pre>
+<pre class="out"><code>1f2e3d4 (HEAD -&gt; feature/login) Bump app for login</code></pre>
+      <h4>4b. Fix and continue</h4>
+<pre><code>git rebase main                      # stops again
+echo "v2 from both" &gt; app.txt
+git add app.txt
+GIT_EDITOR=true git rebase --continue   # skips the message editor
+git log --oneline main..</code></pre>
+<pre class="out"><code>Successfully rebased and updated refs/heads/feature/login.
+8c7b6a5 Bump app for login
+2e3f4a5 Validate password
+6d5c4b3 Add login form</code></pre>
+      <h4>4c. Skip drops the commit</h4>
+<pre><code>git reset -q --hard ORIG_HEAD        # back to before 4b
+git rebase main                      # stops again
+git rebase --skip
+git log --oneline main..</code></pre>
+<pre class="out"><code>Successfully rebased and updated refs/heads/feature/login.
+2e3f4a5 Validate password
+6d5c4b3 Add login form</code></pre>
+      <p class="look">Look at: after <code>--skip</code>, <i>Bump app for login</i> is gone from the branch. Skipping isn't "deal with it later".</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P5</span>The alternative: merge keeps hashes</h3>
+<pre><code>demo
+git merge -q --no-edit main
+git log --oneline --graph
+git rev-parse --short HEAD^1</code></pre>
+<pre class="out"><code>*   e1f2a3b (HEAD -&gt; feature/login) Merge branch 'main' into feature/login
+|\
+| * 9e8f7d6 (main) Add footer
+* | 7a9b0c5 Validate password
+* | 3c1d2e4 Add login form
+|/
+* a1b2c3d Initial app
+7a9b0c5</code></pre>
+      <p class="look">Look at: <code>7a9b0c5</code> and <code>3c1d2e4</code> are unchanged, so a normal push works. The cost is the extra merge commit and the forked shape.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P6</span>Interactive rebase squashes</h3>
+      <p class="claim"><code>GIT_SEQUENCE_EDITOR</code> edits the todo list for you, so this runs without opening an editor. It turns line 2 from <code>pick</code> into <code>fixup</code>.</p>
+<pre><code>demo
+GIT_SEQUENCE_EDITOR="sed -i.bak '2s/^pick/fixup/'" git rebase -i main
+git log --oneline main..
+cat login.txt</code></pre>
+<pre class="out"><code>Successfully rebased and updated refs/heads/feature/login.
+c3d4e5f Add login form
+login form
+check password</code></pre>
+      <p class="look">Look at: one commit left, with the first commit's message and both commits' changes. Use <code>squash</code> instead to combine both messages (git opens an editor), <code>reword</code> to change a message, or <code>drop</code> to remove a commit.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P7</span>A pushed branch needs a force-push</h3>
+<pre><code>demo
+R="$(mktemp -d)/server.git"; git init -q --bare "$R"
+git remote add origin "$R"
+git push -q -u origin main feature/login
+git rebase -q main
+git push
+git push --force-with-lease</code></pre>
+<pre class="out"><code> ! [rejected]        feature/login -&gt; feature/login (non-fast-forward)
+error: failed to push some refs to '…/server.git'
+hint: Updates were rejected because the tip of your current branch is behind
+hint: its remote counterpart. …
+To …/server.git
+ + 7a9b0c5...d4e3f2a feature/login -&gt; feature/login (forced update)</code></pre>
+      <p class="look">Look at: the plain push is refused even though you added nothing wrong. The <code>+</code> and "forced update" mark the overwrite. The hint suggests <code>git pull</code>. <b>Don't follow it</b> after a rebase: it merges the old copies back in.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P8</span>The lease catches someone else's push</h3>
+      <p class="claim">bob pushes a commit to the branch after alice's last fetch. alice then rebases and tries to push.</p>
+<pre><code>demo
+R="$(mktemp -d)/server.git"; git init -q --bare "$R"
+git remote add origin "$R"; git push -q -u origin main feature/login
+B="$(mktemp -d)/bob"; git clone -q -b feature/login "$R" "$B"
+( cd "$B" &amp;&amp; git config user.name bob &amp;&amp; git config user.email bob@example.com \
+  &amp;&amp; echo "remember me" &gt; remember.txt &amp;&amp; git add remember.txt \
+  &amp;&amp; git commit -qm "Add remember-me" &amp;&amp; git push -q )
+git rebase -q main
+git push --force-with-lease
+git push --force
+git fetch -q; git log --oneline origin/feature/login | grep -c remember</code></pre>
+<pre class="out"><code> ! [rejected]        feature/login -&gt; feature/login (stale info)
+error: failed to push some refs to '…/server.git'
+ + 1a2b3c4...d4e3f2a feature/login -&gt; feature/login (forced update)
+0</code></pre>
+      <p class="look">Look at: the lease refused because the server moved since alice's last fetch. Plain <code>--force</code> went through, and the count of bob's commit on the server is now <b>0</b>. It's gone from the branch.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P9</span>Rebasing a shared branch duplicates commits</h3>
+      <p class="claim">bob builds on the pushed branch. alice rebases and force-pushes. bob pulls.</p>
+<pre><code>demo
+R="$(mktemp -d)/server.git"; git init -q --bare "$R"
+git remote add origin "$R"; git push -q -u origin main feature/login
+B="$(mktemp -d)/bob"; git clone -q -b feature/login "$R" "$B"
+( cd "$B" &amp;&amp; git config user.name bob &amp;&amp; git config user.email bob@example.com \
+  &amp;&amp; echo "remember me" &gt; remember.txt &amp;&amp; git add remember.txt \
+  &amp;&amp; git commit -qm "Add remember-me" )
+git rebase -q main; git push -q --force-with-lease
+cd "$B"; git pull -q --no-rebase --no-edit
+git log --oneline | grep "Add login form"</code></pre>
+<pre class="out"><code>5b6c7d8 Add login form
+3c1d2e4 Add login form</code></pre>
+      <p class="look">Look at: the same commit twice, once per hash. bob's merge stitched the old copies back in. If he pushes, everyone gets both. This is why the 10k view calls it the one big risk.</p>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P10</span>Unstaged changes block a rebase</h3>
+<pre><code>demo
+echo wip &gt;&gt; login.txt
+git rebase main
+git rebase --autostash main</code></pre>
+<pre class="out"><code>error: cannot rebase: You have unstaged changes.
+error: Please commit or stash them.
+Created autostash: 4d5e6f7
+Applied autostash.
+Successfully rebased and updated refs/heads/feature/login.</code></pre>
+    </div>
+
+    <div class="proof">
+      <h3><span class="tag">P11</span>How long the safety net lasts</h3>
+      <p class="claim">The old commits are "unreachable" after a rebase: no branch points at them. Their reflog entries expire on the <code>gc.reflogExpireUnreachable</code> clock. Unset config means the default applies.</p>
+<pre><code>git config --get gc.reflogExpire               # empty = default 90 days
+git config --get gc.reflogExpireUnreachable    # empty = default 30 days
+git help config   # search for reflogExpireUnreachable</code></pre>
+      <p class="look">Look at: both print nothing on a stock setup, so the documented defaults (90 and 30 days) apply. Garbage collection can delete the commits only after their reflog entries expire.</p>
+    </div>
+
+    <h3>Alternatives considered</h3>
+    <div class="tbl"><table>
+      <thead><tr><th>Alternative</th><th>Why not the default here</th></tr></thead>
+      <tbody>
+        <tr><td>Merge main into the branch (P5)</td><td>Safe and fine. Adds a merge commit per sync. The right call when the branch is shared.</td></tr>
+        <tr><td><code>git pull --rebase</code></td><td>Rebases your local commits onto the server copy of the <i>same</i> branch. Useful for syncing with teammates, not for moving onto main.</td></tr>
+        <tr><td>Squash-merge in the pull request</td><td>Gives main one clean commit with no local rebase. You still need to sync with main if there are conflicts.</td></tr>
+        <tr><td><code>git push --force</code></td><td>Erases others' pushes without warning (P8).</td></tr>
+        <tr><td>Never update the branch</td><td>Conflicts land on the reviewer or the merge button instead of on you.</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('[role="tab"]'));
+  var ids=tabs.map(function(t){return t.getAttribute('aria-controls');});
+  function show(id){tabs.forEach(function(t){var on=t.getAttribute('aria-controls')===id;t.setAttribute('aria-selected',on?'true':'false');t.tabIndex=on?0:-1;document.getElementById(t.getAttribute('aria-controls')).hidden=!on;});}
+  tabs.forEach(function(t,i){
+    t.addEventListener('click',function(){var id=t.getAttribute('aria-controls');show(id);try{history.replaceState(null,'','#'+id)}catch(e){}window.scrollTo(0,0);});
+    t.addEventListener('keydown',function(e){var d=e.key==='ArrowRight'?1:e.key==='ArrowLeft'?-1:0;if(!d)return;e.preventDefault();var n=tabs[(i+d+tabs.length)%tabs.length];n.focus();n.click();});
+  });
+  function fromHash(){var h=(location.hash||'').slice(1);show(ids.indexOf(h)>-1?h:'v10k');}
+  window.addEventListener('hashchange',fromHash);
+  fromHash();
+})();
+</script>
+</body>
+</html>

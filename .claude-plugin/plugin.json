@@ -1,0 +1,10 @@
+{
+  "name": "altitude",
+  "version": "1.2.0",
+  "description": "Get any agent answer as one HTML page with four tabs: a 10k, 5k, 1k, and 100 view of the same topic. Read only as deep as you need. Type /altitude after any answer.",
+  "author": {
+    "name": "Jordan Bench"
+  },
+  "license": "MIT",
+  "keywords": ["altitude", "reading", "html", "explainer", "comprehension", "progressive-disclosure", "developer-velocity"]
+}
